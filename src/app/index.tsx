@@ -131,5 +131,5 @@ const styles = StyleSheet.create({
   questDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: BrutlColors.accent },
   questInfo: { flex: 1, gap: BrutlSpacing.xs },
   questProgress: { height: 3, backgroundColor: BrutlColors.border, borderRadius: 9999, overflow: 'hidden' },
-  questProgressFill: { height: '100%', backgroundColor: BrutlColors.accent },
+  questProgressFill: { position: 'absolute', top: 0, bottom: 0, left: 0, backgroundColor: BrutlColors.accent },
 });

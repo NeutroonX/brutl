@@ -30,7 +30,7 @@ const styles = StyleSheet.create({
   questHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   questTitle: { fontSize: 20 },
   progressTrack: { height: 4, backgroundColor: BrutlColors.border, borderRadius: 9999, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 9999 },
+  progressFill: { position: 'absolute', top: 0, bottom: 0, left: 0, borderRadius: 9999 },
   timerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   completedOverlay: { opacity: 0.4 },
   completedBadge: {

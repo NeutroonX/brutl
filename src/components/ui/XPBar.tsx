@@ -20,7 +20,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   fill: {
-    height: '100%',
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
     backgroundColor: BrutlColors.accent,
     borderRadius: BrutlRadius.full,
   },
