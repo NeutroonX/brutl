@@ -89,7 +89,7 @@ export default function AppTabs() {
 
   return (
     <View style={styles.root}>
-      <View style={[styles.screen, { paddingBottom: contentPad }]}>
+      <View style={[styles.screen, { paddingTop: insets.top, paddingBottom: contentPad }]}>
         <Slot />
       </View>
 

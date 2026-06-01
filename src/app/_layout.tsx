@@ -22,7 +22,8 @@ export default function RootLayout() {
 
   useEffect(() => {
     StatusBar.setBarStyle('light-content');
-    StatusBar.setBackgroundColor('#000000');
+    StatusBar.setBackgroundColor('transparent');
+    StatusBar.setTranslucent(true);
     Promise.all([loadUser(), loadRoasts(), loadWorkouts(), loadDiet(), loadQuests()]);
   }, []);
 
