@@ -71,9 +71,8 @@ export function RankUpModal({ visible, newRank, onDismiss }: RankUpModalProps) {
             <Animated.View
               style={[
                 styles.glowRing,
-                { backgroundColor: rankColor, opacity: glowOpacity },
-                StyleSheet.absoluteFillObject,
-                { borderRadius: 999 },
+                StyleSheet.absoluteFill,
+                { backgroundColor: rankColor, opacity: glowOpacity, borderRadius: 999 },
               ]}
             />
             <RankBadge rank={newRank} size="lg" />
