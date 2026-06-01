@@ -1,8 +1,3 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
-
 import '@/global.css';
 
 import { Platform } from 'react-native';
@@ -26,15 +21,51 @@ export const Colors = {
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
+// BRUTL brand tokens — hardcoded, no light/dark switching
+export const BrutlColors = {
+  bg: '#000000',
+  bgCard: '#111111',
+  bgCardSubtle: '#0D0D0D',
+  border: '#1A1A1A',
+  borderVisible: '#2A2A2A',
+  accent: '#E24B4A',
+  accentDim: '#991F1F',
+  textPrimary: '#F0F0F0',
+  textMuted: '#999999',
+  textDisabled: '#444444',
+  success: '#4AE24B',
+  warning: '#E2A54A',
+} as const;
+
+export const BrutlFonts = {
+  display: 'BebasNeue_400Regular',
+  body: Platform.select({ ios: 'system-ui', android: 'sans-serif', default: 'normal' }),
+  mono: Platform.select({ ios: 'ui-monospace', android: 'monospace', default: 'monospace' }),
+} as const;
+
+export const BrutlSpacing = {
+  xs: 4,
+  sm: 8,
+  md: 16,
+  lg: 24,
+  xl: 32,
+  xxl: 48,
+  xxxl: 64,
+} as const;
+
+export const BrutlRadius = {
+  sm: 4,
+  md: 8,
+  lg: 12,
+  xl: 20,
+  full: 9999,
+} as const;
+
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
     sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
     serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
     rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
     mono: 'ui-monospace',
   },
   default: {
