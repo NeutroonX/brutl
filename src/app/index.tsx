@@ -1,98 +1,135 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useEffect } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BrutlCard } from '@/components/ui/BrutlCard';
+import { BrutlText } from '@/components/ui/BrutlText';
+import { RankBadge } from '@/components/ui/RankBadge';
+import { XPBar } from '@/components/ui/XPBar';
+import { BrutlColors, BrutlSpacing } from '@/constants/theme';
+import { buildRoastPayload, streamRoast } from '@/lib/roast-engine';
+import { RANK_TITLES, getXPInCurrentRank, getXPRangeForRank } from '@/lib/rank';
+import { useQuestStore } from '@/stores/quest.store';
+import { useRoastStore } from '@/stores/roast.store';
+import { useUserStore } from '@/stores/user.store';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+const MOCKED_VITALS = [
+  { label: 'HR', value: '--', unit: 'bpm' },
+  { label: 'HRV', value: '--', unit: 'ms' },
+  { label: 'SLEEP', value: '--', unit: 'h' },
+  { label: 'RECOVERY', value: '--', unit: '%' },
+];
 
 export default function HomeScreen() {
+  const profile = useUserStore((s) => s.profile);
+  const { currentRoast, correctionText, isStreaming, log: roastLog } = useRoastStore();
+  const quests = useQuestStore((s) => s.quests);
+  const activeQuests = quests.filter((q) => !q.completedAt).slice(0, 2);
+
+  useEffect(() => {
+    if (!profile) return;
+    const payload = buildRoastPayload('APP_OPEN', profile.rank, profile.streakDays);
+    streamRoast(payload);
+  }, []);
+
+  if (!profile) return null;
+
+  const xpInRank = getXPInCurrentRank(profile.xp, profile.rank);
+  const xpRange = getXPRangeForRank(profile.rank);
+  const latestRoast = currentRoast || roastLog[0]?.roastText || '';
+  const latestCorrection = isStreaming ? '' : correctionText || roastLog[0]?.correctionText || '';
+
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+    <View style={styles.container}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+        {/* Rank Strip */}
+        <BrutlCard>
+          <View style={styles.rankStrip}>
+            <RankBadge rank={profile.rank} size="lg" />
+            <View style={styles.rankInfo}>
+              <BrutlText variant="display" style={{ fontSize: 28 }}>
+                {profile.rank} — {RANK_TITLES[profile.rank]}
+              </BrutlText>
+              <BrutlText variant="caption">{profile.streakDays} day streak</BrutlText>
+              <XPBar current={xpInRank} max={xpRange} label="RANK XP" />
+            </View>
+          </View>
+        </BrutlCard>
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+        {/* Watch Vitals (mocked in P1) */}
+        <BrutlCard subtle>
+          <BrutlText variant="caption" style={styles.sectionLabel}>VITALS</BrutlText>
+          <View style={styles.vitalsRow}>
+            {MOCKED_VITALS.map((v) => (
+              <View key={v.label} style={styles.vitalBox}>
+                <BrutlText style={[styles.vitalValue, { color: BrutlColors.textPrimary }]}>{v.value}</BrutlText>
+                <BrutlText variant="caption">{v.unit}</BrutlText>
+                <BrutlText variant="caption" style={{ color: BrutlColors.textMuted }}>{v.label}</BrutlText>
+              </View>
+            ))}
+          </View>
+        </BrutlCard>
 
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+        {/* Roast Card */}
+        {latestRoast && (
+          <BrutlCard>
+            <View style={styles.roastBox}>
+              <BrutlText variant="caption" style={styles.sectionLabel}>
+                {isStreaming ? 'INCOMING ROAST' : "TODAY'S ROAST"}
+              </BrutlText>
+              <BrutlText variant="body">
+                {latestRoast}
+                {isStreaming && <BrutlText style={styles.cursor}>|</BrutlText>}
+              </BrutlText>
+              {latestCorrection && (
+                <BrutlText variant="accent">→ {latestCorrection}</BrutlText>
+              )}
+            </View>
+          </BrutlCard>
+        )}
+
+        {/* Active Quests */}
+        {activeQuests.length > 0 && (
+          <View style={{ gap: BrutlSpacing.sm }}>
+            <BrutlText variant="caption" style={styles.sectionLabel}>ACTIVE QUESTS</BrutlText>
+            {activeQuests.map((q) => (
+              <BrutlCard key={q.id} subtle>
+                <View style={styles.questItem}>
+                  <View style={styles.questDot} />
+                  <View style={styles.questInfo}>
+                    <BrutlText variant="body">{q.title}</BrutlText>
+                    <BrutlText variant="caption">{q.description}</BrutlText>
+                    <View style={styles.questProgress}>
+                      <View style={[styles.questProgressFill, { width: `${Math.round(q.progress * 100)}%` }]} />
+                    </View>
+                  </View>
+                  <BrutlText variant="accent">+{q.xpReward}</BrutlText>
+                </View>
+              </BrutlCard>
+            ))}
+          </View>
+        )}
+
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
+  container: { flex: 1, backgroundColor: BrutlColors.bg },
+  scroll: { flex: 1 },
+  content: { padding: BrutlSpacing.xl, gap: BrutlSpacing.lg, paddingBottom: BrutlSpacing.xxxl },
+  sectionLabel: { color: BrutlColors.accent, marginBottom: BrutlSpacing.sm },
+  rankStrip: { flexDirection: 'row', alignItems: 'center', gap: BrutlSpacing.md },
+  rankInfo: { flex: 1, gap: BrutlSpacing.xs },
+  vitalsRow: { flexDirection: 'row', gap: BrutlSpacing.sm },
+  vitalBox: { flex: 1, alignItems: 'center', gap: BrutlSpacing.xs },
+  vitalValue: { fontSize: 22, fontFamily: 'BebasNeue_400Regular' },
+  roastBox: { gap: BrutlSpacing.sm },
+  cursor: { color: BrutlColors.accent, fontWeight: '700' },
+  questItem: { flexDirection: 'row', alignItems: 'center', gap: BrutlSpacing.md },
+  questDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: BrutlColors.accent },
+  questInfo: { flex: 1, gap: BrutlSpacing.xs },
+  questProgress: { height: 3, backgroundColor: BrutlColors.border, borderRadius: 9999, overflow: 'hidden' },
+  questProgressFill: { height: '100%', backgroundColor: BrutlColors.accent },
 });
