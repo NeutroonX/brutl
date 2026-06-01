@@ -31,16 +31,27 @@ interface TabItemProps {
 function TabItem({ icon, iconOutline, isActive, onPress }: TabItemProps) {
   const scale = useRef(new Animated.Value(1)).current;
 
-  function handlePress() {
-    Animated.sequence([
-      Animated.spring(scale, { toValue: 0.72, useNativeDriver: true, tension: 400, friction: 8 }),
-      Animated.spring(scale, { toValue: 1,    useNativeDriver: true, tension: 150, friction: 7 }),
-    ]).start();
+  function pressIn() {
+    Animated.spring(scale, {
+      toValue: 0.8,
+      useNativeDriver: true,
+      tension: 300,
+      friction: 10,
+    }).start();
+  }
+
+  function pressOut() {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 180,
+      friction: 6,
+    }).start();
     onPress();
   }
 
   return (
-    <Pressable onPress={handlePress} style={styles.tabItem} hitSlop={10}>
+    <Pressable onPressIn={pressIn} onPressOut={pressOut} style={styles.tabItem} hitSlop={10}>
       <Animated.View style={[styles.iconWrap, isActive && styles.iconWrapActive, { transform: [{ scale }] }]}>
         <Ionicons
           name={isActive ? icon : iconOutline}
