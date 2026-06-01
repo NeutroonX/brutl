@@ -40,7 +40,7 @@ export default function FirstRoastScreen() {
 
   async function handleBegin() {
     await setHasOnboarded(true);
-    router.replace('/(tabs)');
+    router.replace('/');
   }
 
   if (!profile) return null;
