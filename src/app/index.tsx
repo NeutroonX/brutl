@@ -71,7 +71,7 @@ export default function HomeScreen() {
         </BrutlCard>
 
         {/* Roast Card */}
-        {latestRoast && (
+        {!!latestRoast && (
           <BrutlCard>
             <View style={styles.roastBox}>
               <BrutlText variant="caption" style={styles.sectionLabel}>
@@ -81,7 +81,7 @@ export default function HomeScreen() {
                 {latestRoast}
                 {isStreaming && <BrutlText style={styles.cursor}>|</BrutlText>}
               </BrutlText>
-              {latestCorrection && (
+              {!!latestCorrection && (
                 <BrutlText variant="accent">→ {latestCorrection}</BrutlText>
               )}
             </View>

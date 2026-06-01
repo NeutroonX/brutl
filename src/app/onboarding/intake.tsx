@@ -128,7 +128,7 @@ export default function IntakeScreen() {
               placeholderTextColor={BrutlColors.textDisabled}
               placeholder={fieldPlaceholder(field)}
             />
-            {reactions[field] && <BrutlText style={styles.reaction}>{reactions[field]}</BrutlText>}
+            {!!reactions[field] && <BrutlText style={styles.reaction}>{reactions[field]}</BrutlText>}
           </View>
         ))}
 
@@ -145,7 +145,7 @@ export default function IntakeScreen() {
               </TouchableOpacity>
             ))}
           </View>
-          {reactions.goal && <BrutlText style={styles.reaction}>{reactions.goal}</BrutlText>}
+          {!!reactions.goal && <BrutlText style={styles.reaction}>{reactions.goal}</BrutlText>}
         </View>
 
         <View style={styles.field}>
@@ -161,7 +161,7 @@ export default function IntakeScreen() {
               </TouchableOpacity>
             ))}
           </View>
-          {reactions.weakArea && <BrutlText style={styles.reaction}>{reactions.weakArea}</BrutlText>}
+          {!!reactions.weakArea && <BrutlText style={styles.reaction}>{reactions.weakArea}</BrutlText>}
         </View>
       </ScrollView>
 

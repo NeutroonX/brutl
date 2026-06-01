@@ -61,7 +61,7 @@ export default function FirstRoastScreen() {
           </View>
         </BrutlCard>
 
-        {(currentRoast || isStreaming) && (
+        {!!(currentRoast || isStreaming) && (
           <BrutlCard>
             <View style={styles.roastBox}>
               <BrutlText variant="caption" style={{ color: BrutlColors.accent }}>
@@ -71,7 +71,7 @@ export default function FirstRoastScreen() {
                 {currentRoast}
                 {isStreaming && <BrutlText style={styles.cursor}>|</BrutlText>}
               </BrutlText>
-              {correctionText && !isStreaming && (
+              {!!correctionText && !isStreaming && (
                 <BrutlText variant="accent">→ {correctionText}</BrutlText>
               )}
             </View>
