@@ -1,10 +1,13 @@
 import { useEffect } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 
 import { BrutlCard } from '@/components/ui/BrutlCard';
 import { BrutlText } from '@/components/ui/BrutlText';
 import { RankBadge } from '@/components/ui/RankBadge';
 import { XPBar } from '@/components/ui/XPBar';
+import { RankUpModal } from '@/components/RankUpModal';
 import { BrutlColors, BrutlSpacing } from '@/constants/theme';
 import { buildRoastPayload, streamRoast } from '@/lib/roast-engine';
 import { RANK_TITLES, getXPInCurrentRank, getXPRangeForRank } from '@/lib/rank';
@@ -15,6 +18,9 @@ import { useWatchStore } from '@/stores/watch.store';
 
 export default function HomeScreen() {
   const profile = useUserStore((s) => s.profile);
+  const pendingRankUp = useUserStore((s) => s.pendingRankUp);
+  const clearPendingRankUp = useUserStore((s) => s.clearPendingRankUp);
+  const checkAndUpdateStreak = useUserStore((s) => s.checkAndUpdateStreak);
   const { currentRoast, correctionText, isStreaming, log: roastLog } = useRoastStore();
   const quests = useQuestStore((s) => s.quests);
   const activeQuests = quests.filter((q) => !q.completedAt).slice(0, 2);
@@ -22,6 +28,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (!profile) return;
+    checkAndUpdateStreak().catch(() => {});
     const init = async () => {
       try {
         if (isAvailable && hasPermission) await syncVitals();
@@ -47,6 +54,9 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      {!!pendingRankUp && (
+        <RankUpModal visible newRank={pendingRankUp} onDismiss={clearPendingRankUp} />
+      )}
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
 
         {/* Rank Strip */}
@@ -60,6 +70,9 @@ export default function HomeScreen() {
               <BrutlText variant="caption">{profile.streakDays} day streak</BrutlText>
               <XPBar current={xpInRank} max={xpRange} label="RANK XP" />
             </View>
+            <TouchableOpacity onPress={() => router.push('/settings' as any)} hitSlop={12}>
+              <Ionicons name="settings-outline" size={22} color={BrutlColors.textMuted} />
+            </TouchableOpacity>
           </View>
         </BrutlCard>
 

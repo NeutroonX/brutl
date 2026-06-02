@@ -26,4 +26,5 @@ export const STORAGE_KEYS = {
   quests: 'brutl:quests',
   hasOnboarded: 'brutl:has_onboarded',
   watchVitals: 'brutl:watch_vitals',
+  lastOpenDate: 'brutl:last_open_date',
 } as const;
