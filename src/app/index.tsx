@@ -22,9 +22,10 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (!profile) return;
-    // Sync health data first, then roast with real data
     const init = async () => {
-      if (isAvailable && hasPermission) await syncVitals();
+      try {
+        if (isAvailable && hasPermission) await syncVitals();
+      } catch { /* health connect unavailable */ }
       const { vitals: v } = useWatchStore.getState();
       const watchData = (v.hrv || v.sleepHours) ? {
         date: Date.now(), restingHR: v.restingHR ?? 0, hrv: v.hrv ?? 0,
@@ -32,7 +33,7 @@ export default function HomeScreen() {
         stressLevel: 0, steps: v.steps ?? 0, caloriesBurned: 0, source: 'WEAR_OS' as const,
       } : null;
       const payload = buildRoastPayload('APP_OPEN', profile.rank, profile.streakDays, watchData);
-      streamRoast(payload);
+      streamRoast(payload).catch(() => {});
     };
     init();
   }, []);

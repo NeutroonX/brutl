@@ -1,6 +1,6 @@
 import { BebasNeue_400Regular, useFonts } from '@expo-google-fonts/bebas-neue';
 import { DarkTheme, ThemeProvider, router } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { StatusBar } from 'react-native';
 
 import AppTabs from '@/components/app-tabs';
@@ -12,7 +12,8 @@ import { useQuestStore } from '@/stores/quest.store';
 import { useWatchStore } from '@/stores/watch.store';
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({ BebasNeue_400Regular });
+  const [fontsLoaded, fontError] = useFonts({ BebasNeue_400Regular });
+  const [ready, setReady] = useState(false);
 
   const loadUser = useUserStore((s) => s.loadFromStorage);
   const loadRoasts = useRoastStore((s) => s.loadFromStorage);
@@ -26,17 +27,19 @@ export default function RootLayout() {
     StatusBar.setBarStyle('light-content');
     StatusBar.setBackgroundColor('transparent');
     StatusBar.setTranslucent(true);
-    Promise.all([loadUser(), loadRoasts(), loadWorkouts(), loadDiet(), loadQuests(), loadWatch()]);
+    Promise.all([loadUser(), loadRoasts(), loadWorkouts(), loadDiet(), loadQuests(), loadWatch()])
+      .finally(() => setReady(true));
   }, []);
 
   useEffect(() => {
-    if (!fontsLoaded) return;
+    if (!(fontsLoaded || fontError) || !ready) return;
     if (!hasOnboarded) {
       router.replace('/onboarding/cold-open');
     }
-  }, [fontsLoaded, hasOnboarded]);
+  }, [fontsLoaded, fontError, hasOnboarded, ready]);
 
-  if (!fontsLoaded) return null;
+  // Render once fonts are resolved (loaded or errored) AND stores are ready
+  if (!(fontsLoaded || fontError) || !ready) return null;
 
   return (
     <ThemeProvider value={DarkTheme}>

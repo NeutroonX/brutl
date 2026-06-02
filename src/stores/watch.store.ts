@@ -53,11 +53,14 @@ export const useWatchStore = create<WatchState>((set, get) => ({
   },
 
   loadFromStorage: async () => {
-    const saved = await storageGet<{ vitals: VitalsSnapshot; lastSyncAt: number }>(STORAGE_KEYS.watchVitals);
-    if (saved) set({ vitals: saved.vitals, lastSyncAt: saved.lastSyncAt });
+    try {
+      const saved = await storageGet<{ vitals: VitalsSnapshot; lastSyncAt: number }>(STORAGE_KEYS.watchVitals);
+      if (saved) set({ vitals: saved.vitals, lastSyncAt: saved.lastSyncAt });
+    } catch { /* storage unavailable */ }
 
-    // Check availability on load
-    const available = await isHealthConnectAvailable();
-    set({ isAvailable: available });
+    try {
+      const available = await isHealthConnectAvailable();
+      set({ isAvailable: available });
+    } catch { /* health connect unavailable */ }
   },
 }));

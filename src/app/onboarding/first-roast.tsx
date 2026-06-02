@@ -13,7 +13,6 @@ import { RANK_TITLES } from '@/lib/rank';
 import { useQuestStore } from '@/stores/quest.store';
 import { useRoastStore } from '@/stores/roast.store';
 import { useUserStore } from '@/stores/user.store';
-import { useWatchStore } from '@/stores/watch.store';
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BrutlColors.bg },
@@ -31,15 +30,12 @@ export default function FirstRoastScreen() {
   const setHasOnboarded = useUserStore((s) => s.setHasOnboarded);
   const { currentRoast, correctionText, isStreaming } = useRoastStore();
   const seedInitialQuests = useQuestStore((s) => s.seedInitialQuests);
-  const requestPermissions = useWatchStore((s) => s.requestPermissions);
 
   useEffect(() => {
     if (!profile) return;
     const payload = buildRoastPayload('APP_OPEN', profile.rank, profile.streakDays);
-    streamRoast(payload);
-    seedInitialQuests();
-    // Request health permissions silently during onboarding
-    requestPermissions();
+    streamRoast(payload).catch(() => {});
+    seedInitialQuests().catch(() => {});
   }, []);
 
   async function handleBegin() {
