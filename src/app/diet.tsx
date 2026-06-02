@@ -33,15 +33,15 @@ interface FoodResult {
 }
 
 async function searchOpenFoodFacts(query: string): Promise<FoodResult[]> {
-  const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=10`;
+  const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=10&lc=en&lang=en`;
   try {
     const res = await fetch(url);
     const data = await res.json();
     return (data.products ?? [])
-      .filter((p: any) => p.product_name && p.nutriments)
+      .filter((p: any) => (p.product_name_en || p.product_name) && p.nutriments)
       .slice(0, 8)
       .map((p: any) => ({
-        name: p.product_name || 'Unknown',
+        name: p.product_name_en || p.product_name || 'Unknown',
         calories: Math.round(p.nutriments['energy-kcal_100g'] ?? p.nutriments['energy-kcal'] ?? 0),
         proteinG: parseFloat((p.nutriments['proteins_100g'] ?? 0).toFixed(1)),
         carbsG: parseFloat((p.nutriments['carbohydrates_100g'] ?? 0).toFixed(1)),

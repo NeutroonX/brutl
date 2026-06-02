@@ -8,11 +8,11 @@ import { BrutlText } from '@/components/ui/BrutlText';
 import { BrutlColors, BrutlSpacing } from '@/constants/theme';
 
 const FAKE_WEEK = [
-  { day: 'Mon', workout: 'Skipped', diet: '62% compliance' },
-  { day: 'Tue', workout: 'Half session, left early', diet: '41% compliance' },
-  { day: 'Wed', workout: 'Rest day (unplanned)', diet: 'Burger + fries' },
-  { day: 'Thu', workout: 'Bench: 60kg (baseline: 80kg)', diet: '55% compliance' },
-  { day: 'Fri', workout: 'Skipped again', diet: 'Pizza. Twice.' },
+  { day: 'MON', workout: 'Skipped',                    diet: '62% protein hit' },
+  { day: 'TUE', workout: 'Half session, left early',   diet: '41% protein hit' },
+  { day: 'WED', workout: 'Rest day (unplanned)',        diet: 'Burger + fries' },
+  { day: 'THU', workout: 'Bench 60kg (PB: 80kg)',      diet: '55% protein hit' },
+  { day: 'FRI', workout: 'Skipped again',              diet: 'Pizza. Twice.' },
 ];
 
 const DEMO_ROAST =
@@ -27,11 +27,38 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { padding: BrutlSpacing.xl, gap: BrutlSpacing.md, paddingBottom: 120 },
   header: { gap: BrutlSpacing.sm, marginBottom: BrutlSpacing.sm },
-  weekRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: BrutlSpacing.xs },
-  redDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: BrutlColors.accent, marginRight: BrutlSpacing.sm },
-  roastBox: { borderLeftWidth: 3, borderLeftColor: BrutlColors.accent, paddingLeft: BrutlSpacing.md, gap: BrutlSpacing.sm },
+  tableHeader: {
+    flexDirection: 'row',
+    paddingVertical: BrutlSpacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: BrutlColors.borderVisible,
+    marginBottom: 4,
+  },
+  weekRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: BrutlSpacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: BrutlColors.border,
+  },
+  dayCol: { width: 40 },
+  workoutCol: { flex: 3, paddingRight: BrutlSpacing.sm },
+  dietCol: { flex: 2 },
+  redDot: {
+    width: 6, height: 6, borderRadius: 3,
+    backgroundColor: BrutlColors.accent,
+    marginTop: 5, marginRight: 6,
+  },
+  dayText: { color: BrutlColors.accent, fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+  roastBox: {
+    borderLeftWidth: 3, borderLeftColor: BrutlColors.accent,
+    paddingLeft: BrutlSpacing.md, gap: BrutlSpacing.sm,
+  },
   cursor: { color: BrutlColors.accent, fontWeight: '700' },
-  ctaArea: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: BrutlSpacing.xl, backgroundColor: BrutlColors.bg },
+  ctaArea: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    padding: BrutlSpacing.xl, backgroundColor: BrutlColors.bg,
+  },
 });
 
 export default function DemoScreen() {
@@ -65,16 +92,21 @@ export default function DemoScreen() {
         </Animated.View>
 
         <BrutlCard>
-          {FAKE_WEEK.map((row) => (
-            <View key={row.day} style={styles.weekRow}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {/* Table header */}
+          <View style={styles.tableHeader}>
+            <View style={styles.dayCol} />
+            <BrutlText variant="caption" style={[styles.workoutCol, { color: BrutlColors.textMuted }]}>WORKOUT</BrutlText>
+            <BrutlText variant="caption" style={[styles.dietCol, { color: BrutlColors.textMuted }]}>DIET</BrutlText>
+          </View>
+
+          {FAKE_WEEK.map((row, i) => (
+            <View key={row.day} style={[styles.weekRow, i === FAKE_WEEK.length - 1 && { borderBottomWidth: 0 }]}>
+              <View style={[styles.dayCol, { flexDirection: 'row', alignItems: 'center' }]}>
                 <View style={styles.redDot} />
-                <BrutlText variant="body">{row.day}</BrutlText>
+                <BrutlText style={styles.dayText}>{row.day}</BrutlText>
               </View>
-              <View style={{ flex: 1, marginLeft: BrutlSpacing.md }}>
-                <BrutlText variant="caption">{row.workout}</BrutlText>
-                <BrutlText variant="caption" style={{ color: BrutlColors.accentDim }}>{row.diet}</BrutlText>
-              </View>
+              <BrutlText variant="caption" style={styles.workoutCol}>{row.workout}</BrutlText>
+              <BrutlText variant="caption" style={[styles.dietCol, { color: BrutlColors.accentDim }]}>{row.diet}</BrutlText>
             </View>
           ))}
         </BrutlCard>

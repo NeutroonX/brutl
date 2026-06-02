@@ -30,13 +30,17 @@ export const useWatchStore = create<WatchState>((set, get) => ({
   isSyncing: false,
 
   requestPermissions: async () => {
-    const available = await isHealthConnectAvailable();
-    if (!available) { set({ isAvailable: false }); return false; }
-
-    await initHealthConnect();
-    const granted = await requestHealthPermissions();
-    set({ isAvailable: true, hasPermission: granted });
-    return granted;
+    try {
+      const available = await isHealthConnectAvailable();
+      if (!available) { set({ isAvailable: false }); return false; }
+      await initHealthConnect();
+      const granted = await requestHealthPermissions();
+      set({ isAvailable: true, hasPermission: granted });
+      return granted;
+    } catch {
+      set({ isAvailable: false, hasPermission: false });
+      return false;
+    }
   },
 
   syncVitals: async () => {

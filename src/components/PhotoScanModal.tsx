@@ -82,17 +82,23 @@ async function scanMealPhoto(base64: string): Promise<ScannedFood | null> {
 export function PhotoScanModal({ visible, onResult, onClose }: Props) {
   const [permission, requestPermission] = useCameraPermissions();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
   const cameraRef = useRef<CameraView>(null);
 
   async function handleCapture() {
     if (!cameraRef.current || loading) return;
     setLoading(true);
+    setError(false);
     try {
       const photo = await (cameraRef.current as any).takePictureAsync({ base64: true, quality: 0.5 });
       const food = await scanMealPhoto(photo.base64 ?? '');
       if (food) {
         onResult(food);
+      } else {
+        setError(true);
       }
+    } catch {
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -141,6 +147,22 @@ export function PhotoScanModal({ visible, onResult, onClose }: Props) {
             <BrutlText variant="muted" style={styles.loadingText}>
               AI is estimating calories, protein, carbs and fat.
             </BrutlText>
+          </View>
+        )}
+        {error && !loading && (
+          <View style={styles.loading}>
+            <BrutlText variant="heading" style={[styles.loadingText, { color: BrutlColors.accent }]}>
+              Could not analyse meal
+            </BrutlText>
+            <BrutlText variant="muted" style={styles.loadingText}>
+              Try again with better lighting or a closer shot.
+            </BrutlText>
+            <TouchableOpacity
+              onPress={() => setError(false)}
+              style={{ marginTop: 16, borderWidth: 1, borderColor: BrutlColors.accent, borderRadius: 8, paddingHorizontal: 24, paddingVertical: 10 }}
+            >
+              <BrutlText variant="body" style={{ color: BrutlColors.accent }}>TRY AGAIN</BrutlText>
+            </TouchableOpacity>
           </View>
         )}
       </View>

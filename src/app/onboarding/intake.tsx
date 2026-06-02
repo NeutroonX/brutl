@@ -37,6 +37,10 @@ const WEAK_AREAS: { value: WeakArea; label: string }[] = [
   { value: 'LOWER', label: 'Lower Body' },
   { value: 'CARDIO', label: 'Cardio' },
   { value: 'DIET', label: 'Diet' },
+  { value: 'SLEEP', label: 'Sleep' },
+  { value: 'MENTAL', label: 'Mental' },
+  { value: 'CONSISTENCY', label: 'Consistency' },
+  { value: 'FLEXIBILITY', label: 'Flexibility' },
 ];
 
 const styles = StyleSheet.create({
