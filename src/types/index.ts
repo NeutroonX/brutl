@@ -16,6 +16,7 @@ export interface UserProfile {
   rank: Rank;
   xp: number;
   streakDays: number;
+  lastActiveDate: number | null;
   macroTargets: MacroTargets;
   createdAt: number;
 }

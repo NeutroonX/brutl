@@ -47,7 +47,7 @@ Deliver the roast. End with a line starting with "CORRECTION:" for the actionabl
       'X-Title': 'BRUTL',
     },
     body: JSON.stringify({
-      model: 'nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8',
+      model: 'nvidia/llama-3.1-nemotron-ultra-253b-v1:free',
       max_tokens: 256,
       stream: true,
       messages: [

@@ -47,20 +47,23 @@ export function buildUserProfile(data: {
     rank: 'E',
     xp: 0,
     streakDays: 0,
+    lastActiveDate: null,
     macroTargets: calcMacroTargets(data.weightKg, data.goal),
     createdAt: Date.now(),
   };
 }
 
-function todayDateKey(): string {
-  const d = new Date();
+function dateKey(ts: number): string {
+  const d = new Date(ts);
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
+function todayDateKey(): string {
+  return dateKey(Date.now());
+}
+
 function yesterdayDateKey(): string {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  return dateKey(Date.now() - 86_400_000);
 }
 
 export const useUserStore = create<UserState>((set, get) => ({
@@ -100,11 +103,11 @@ export const useUserStore = create<UserState>((set, get) => ({
     if (!profile) return 0;
     const today = todayDateKey();
     const yesterday = yesterdayDateKey();
-    const lastOpen = await storageGet<string>(STORAGE_KEYS.lastOpenDate);
-
-    await storageSet(STORAGE_KEYS.lastOpenDate, today);
+    const lastOpen = profile.lastActiveDate ? dateKey(profile.lastActiveDate) : null;
 
     if (lastOpen === today) return 0; // already opened today
+
+    const now = Date.now();
 
     if (lastOpen === yesterday) {
       const newStreak = profile.streakDays + 1;
@@ -112,19 +115,16 @@ export const useUserStore = create<UserState>((set, get) => ({
       const newXP = Math.max(0, profile.xp + bonus);
       const newRank = getRankFromXP(newXP);
       const rankChanged = newRank !== profile.rank;
-      const updated = { ...profile, streakDays: newStreak, xp: newXP, rank: newRank };
+      const updated = { ...profile, streakDays: newStreak, xp: newXP, rank: newRank, lastActiveDate: now };
       set({
         profile: updated,
         pendingRankUp: rankChanged ? newRank : get().pendingRankUp,
       });
       await storageSet(STORAGE_KEYS.user, updated);
-      return bonus; // return so caller can show XP toast
-    } else if (lastOpen !== null && lastOpen !== today) {
-      const updated = { ...profile, streakDays: 1 };
-      set({ profile: updated });
-      await storageSet(STORAGE_KEYS.user, updated);
+      return bonus;
     } else {
-      const updated = { ...profile, streakDays: 1 };
+      // first open ever, or streak broken
+      const updated = { ...profile, streakDays: lastOpen === null ? 1 : 1, lastActiveDate: now };
       set({ profile: updated });
       await storageSet(STORAGE_KEYS.user, updated);
     }

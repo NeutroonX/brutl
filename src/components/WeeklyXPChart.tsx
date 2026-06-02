@@ -55,8 +55,10 @@ function AnimatedBar({ height, color, delay }: { height: number; color: string; 
 const styles = StyleSheet.create({
   container: { gap: BrutlSpacing.sm },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  chart: { flexDirection: 'row', alignItems: 'flex-end', height: CHART_H, gap: 0 },
-  dayCol: { flex: 1, alignItems: 'center', gap: 6 },
+  xpLabelRow: { flexDirection: 'row', height: 14 },
+  chart: { flexDirection: 'row', alignItems: 'flex-end', height: CHART_H },
+  dayLabelRow: { flexDirection: 'row', marginTop: 6 },
+  dayCol: { flex: 1, alignItems: 'center' },
   xpLabel: { fontSize: 9, letterSpacing: 0.3 },
   dayLabel: { fontSize: 9, letterSpacing: 0.5 },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
@@ -66,7 +68,6 @@ export function WeeklyXPChart({ logs }: Props) {
   const monday = getMondayOfWeek(new Date());
   const todayKey = dayKey(Date.now());
 
-  // Build 7 days of XP data
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(monday);
     d.setDate(d.getDate() + i);
@@ -90,34 +91,50 @@ export function WeeklyXPChart({ logs }: Props) {
         </BrutlText>
       </View>
 
+      {/* XP value labels row — separated so they never overflow into heading */}
+      <View style={styles.xpLabelRow}>
+        {days.map((day, i) => (
+          <View key={day.key} style={styles.dayCol}>
+            {day.xp > 0 && (
+              <BrutlText style={[styles.xpLabel, { color: day.isToday ? BrutlColors.accent : BrutlColors.textDisabled }]}>
+                {day.xp}
+              </BrutlText>
+            )}
+          </View>
+        ))}
+      </View>
+
+      {/* Bars only — fixed height, no labels inside */}
       <View style={styles.chart}>
         {days.map((day, i) => {
           const barH = day.xp > 0
-            ? Math.max(MIN_BAR, Math.round((day.xp / maxXP) * (CHART_H - 20)))
+            ? Math.max(MIN_BAR, Math.round((day.xp / maxXP) * CHART_H))
             : MIN_BAR;
           const barColor = day.isToday
             ? BrutlColors.accent
             : day.xp > 0
             ? `${BrutlColors.accent}55`
             : BrutlColors.borderVisible;
-
           return (
             <View key={day.key} style={styles.dayCol}>
-              {day.xp > 0 && (
-                <BrutlText style={[styles.xpLabel, { color: day.isToday ? BrutlColors.accent : BrutlColors.textDisabled }]}>
-                  {day.xp}
-                </BrutlText>
-              )}
               <AnimatedBar height={barH} color={barColor} delay={i * 60} />
-              <BrutlText style={[styles.dayLabel, {
-                color: day.isToday ? BrutlColors.textPrimary : BrutlColors.textDisabled,
-                fontWeight: day.isToday ? '700' : '400',
-              }]}>
-                {day.label}
-              </BrutlText>
             </View>
           );
         })}
+      </View>
+
+      {/* Day labels row */}
+      <View style={styles.dayLabelRow}>
+        {days.map((day) => (
+          <View key={day.key} style={styles.dayCol}>
+            <BrutlText style={[styles.dayLabel, {
+              color: day.isToday ? BrutlColors.textPrimary : BrutlColors.textDisabled,
+              fontWeight: day.isToday ? '700' : '400',
+            }]}>
+              {day.label}
+            </BrutlText>
+          </View>
+        ))}
       </View>
 
       <View style={styles.totalRow}>
