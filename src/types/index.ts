@@ -50,6 +50,7 @@ export interface MealEntry {
   carbsG: number;
   fatG: number;
   servingG: number;
+  loggedAt?: number;
 }
 
 export interface DietLog {

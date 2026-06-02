@@ -11,6 +11,7 @@ interface DietState {
   todayLog: DietLog | null;
   proteinStreakDays: number;
   addMeal: (meal: MealEntry) => Promise<void>;
+  removeMeal: (mealIndex: number) => Promise<void>;
   getTodayCompliance: () => number;
   loadFromStorage: () => Promise<void>;
 }
@@ -41,7 +42,8 @@ export const useDietStore = create<DietState>((set, get) => ({
     const today = todayKey();
     const { logs } = get();
     const existing = logs.find((l) => l.date === today);
-    const meals = existing ? [...existing.meals, meal] : [meal];
+    const stamped: MealEntry = { ...meal, loggedAt: Date.now() };
+    const meals = existing ? [...existing.meals, stamped] : [stamped];
     const macros = sumMacros(meals);
     const updated: DietLog = {
       id: existing?.id ?? Date.now().toString(),
@@ -84,6 +86,20 @@ export const useDietStore = create<DietState>((set, get) => ({
     await useQuestStore.getState().checkShadowTriggers({
       proteinStreakDays: proteinStreak,
     }).catch(() => {});
+  },
+
+  removeMeal: async (mealIndex: number) => {
+    const today = todayKey();
+    const { logs } = get();
+    const existing = logs.find((l) => l.date === today);
+    if (!existing) return;
+    const meals = existing.meals.filter((_, i) => i !== mealIndex);
+    const macros = sumMacros(meals);
+    const updatedLogs = meals.length === 0
+      ? logs.filter((l) => l.date !== today)
+      : logs.map((l) => l.date === today ? { ...existing, meals, ...macros } : l);
+    set({ logs: updatedLogs, todayLog: meals.length === 0 ? null : { ...existing, meals, ...macros } });
+    await storageSet(STORAGE_KEYS.dietLog, updatedLogs);
   },
 
   getTodayCompliance: () => {
