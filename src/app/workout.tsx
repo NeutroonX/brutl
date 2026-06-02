@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 
+import { Ionicons } from '@expo/vector-icons';
 import { BrutlButton } from '@/components/ui/BrutlButton';
 import { BrutlCard } from '@/components/ui/BrutlCard';
 import { BrutlText } from '@/components/ui/BrutlText';
@@ -78,6 +79,7 @@ export default function WorkoutScreen() {
   const updateXP = useUserStore((s) => s.updateXP);
   const addLog = useWorkoutStore((s) => s.addLog);
   const getBaseline = useWorkoutStore((s) => s.getBaselineForExercise);
+  const recentLogs = useWorkoutStore((s) => s.getRecentLogs)(7);
   const multiplier = useDungeonStore((s) => s.getMultiplier)();
   const { pending: xpPending, showXP, clearXP } = useXPToast();
 
@@ -160,6 +162,37 @@ export default function WorkoutScreen() {
       <XPToast amount={xpPending} onHide={clearXP} multiplier={multiplier} />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <BrutlText variant="heading">Log Workout</BrutlText>
+
+        {/* Last session / empty state */}
+        {exercises.length === 0 && recentLogs.length > 0 && (
+          <BrutlCard subtle>
+            <BrutlText variant="caption" style={styles.sectionLabel}>LAST SESSION</BrutlText>
+            <View style={{ gap: BrutlSpacing.xs }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <BrutlText variant="caption">{new Date(recentLogs[0].date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</BrutlText>
+                <BrutlText variant="caption" style={{ color: BrutlColors.accent }}>+{recentLogs[0].xpEarned} XP · {recentLogs[0].durationMinutes}min</BrutlText>
+              </View>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                {[...new Set(recentLogs[0].exercises.map(e => e.exercise))].map((name) => (
+                  <TouchableOpacity key={name} onPress={() => addExercise(name)}
+                    style={{ backgroundColor: BrutlColors.bgCard, borderRadius: 4, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: BrutlColors.borderVisible }}>
+                    <BrutlText variant="caption" style={{ fontSize: 11 }}>+ {name}</BrutlText>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </BrutlCard>
+        )}
+        {exercises.length === 0 && recentLogs.length === 0 && (
+          <BrutlCard subtle>
+            <View style={{ alignItems: 'center', gap: BrutlSpacing.sm, paddingVertical: BrutlSpacing.md }}>
+              <Ionicons name="barbell-outline" size={32} color={BrutlColors.textDisabled} />
+              <BrutlText variant="muted" style={{ textAlign: 'center' }}>
+                No sessions yet. Pick an exercise below and start your first workout.
+              </BrutlText>
+            </View>
+          </BrutlCard>
+        )}
 
         {/* Duration */}
         <View>

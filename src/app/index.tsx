@@ -11,12 +11,52 @@ import { XPToast } from '@/components/ui/XPToast';
 import { RankUpModal } from '@/components/RankUpModal';
 import { BrutlColors, BrutlSpacing } from '@/constants/theme';
 import { buildRoastPayload, streamRoast } from '@/lib/roast-engine';
-import { RANK_TITLES, getXPInCurrentRank, getXPRangeForRank } from '@/lib/rank';
+import { RANK_TITLES, getXPForNextRank, getXPInCurrentRank, getXPRangeForRank } from '@/lib/rank';
 import { useDungeonStore } from '@/stores/dungeon.store';
 import { useQuestStore } from '@/stores/quest.store';
 import { useRoastStore } from '@/stores/roast.store';
 import { useUserStore } from '@/stores/user.store';
 import { useWatchStore } from '@/stores/watch.store';
+import type { Rank } from '@/types';
+
+const NEXT_RANK: Record<Rank, Rank | null> = {
+  E: 'D', D: 'C', C: 'B', B: 'A', A: 'S', S: null,
+};
+
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function todayLabel(): string {
+  return new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
+}
+
+function VitalRing({ label, value, unit, color, icon }: {
+  label: string; value: number | null; unit: string; color: string; icon: string;
+}) {
+  const hasData = value !== null;
+  return (
+    <View style={styles.vitalItem}>
+      <View style={[styles.vitalRing, {
+        borderColor: hasData ? color : BrutlColors.border,
+        backgroundColor: hasData ? `${color}10` : 'transparent',
+      }]}>
+        {hasData ? (
+          <>
+            <BrutlText style={[styles.vitalVal, { color }]}>{value}</BrutlText>
+            <BrutlText style={styles.vitalUnit}>{unit}</BrutlText>
+          </>
+        ) : (
+          <Ionicons name={icon as any} size={18} color={BrutlColors.textDisabled} />
+        )}
+      </View>
+      <BrutlText style={styles.vitalLabel}>{label}</BrutlText>
+    </View>
+  );
+}
 
 export default function HomeScreen() {
   const profile = useUserStore((s) => s.profile);
@@ -26,17 +66,16 @@ export default function HomeScreen() {
   const { currentRoast, correctionText, isStreaming, log: roastLog } = useRoastStore();
   const refreshDailyQuests = useQuestStore((s) => s.refreshDailyQuests);
   const quests = useQuestStore((s) => s.quests);
-  const activeQuests = quests.filter((q) => !q.completedAt && q.expiresAt > Date.now()).slice(0, 2);
+  const activeQuests = quests.filter((q) => !q.completedAt && q.expiresAt > Date.now()).slice(0, 3);
   const { vitals, syncVitals, hasPermission, isAvailable } = useWatchStore();
   const dungeonRun = useDungeonStore((s) => s.run);
   const dungeonMultiplier = useDungeonStore((s) => s.getMultiplier)();
-
-  const [streakXP, setStreakXP] = useState<number | null>(null);
-
   const multiplierActive = dungeonMultiplier > 1;
   const multiplierDaysLeft = dungeonRun?.xpMultiplierUntil
     ? Math.max(0, Math.ceil((dungeonRun.xpMultiplierUntil - Date.now()) / 86_400_000))
     : 0;
+
+  const [streakXP, setStreakXP] = useState<number | null>(null);
 
   useEffect(() => {
     if (!profile) return;
@@ -47,7 +86,7 @@ export default function HomeScreen() {
     const init = async () => {
       try {
         if (isAvailable && hasPermission) await syncVitals();
-      } catch { /* health connect unavailable */ }
+      } catch { }
       const { vitals: v } = useWatchStore.getState();
       const watchData = (v.hrv || v.sleepHours) ? {
         date: Date.now(), restingHR: v.restingHR ?? 0, hrv: v.hrv ?? 0,
@@ -67,88 +106,97 @@ export default function HomeScreen() {
 
   const xpInRank = getXPInCurrentRank(profile.xp, profile.rank);
   const xpRange = getXPRangeForRank(profile.rank);
+  const nextRank = NEXT_RANK[profile.rank];
+  const nextRankName = nextRank ? RANK_TITLES[nextRank] : null;
   const latestRoast = currentRoast || roastLog[0]?.roastText || '';
   const latestCorrection = isStreaming ? '' : correctionText || roastLog[0]?.correctionText || '';
+  const noVitals = !vitals.restingHR && !vitals.hrv && !vitals.sleepHours && !vitals.recoveryScore;
 
   return (
     <View style={styles.container}>
       {!!pendingRankUp && (
-        <RankUpModal
-          visible
-          newRank={pendingRankUp}
-          xpGained={profile.xp}
-          onDismiss={clearPendingRankUp}
-        />
+        <RankUpModal visible newRank={pendingRankUp} xpGained={profile.xp} onDismiss={clearPendingRankUp} />
       )}
       <XPToast amount={streakXP} onHide={() => setStreakXP(null)} />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
 
-        {/* Dungeon multiplier banner */}
+        {/* Greeting header */}
+        <View style={styles.header}>
+          <View>
+            <BrutlText style={styles.greetingText}>{greeting()}, {profile.name.split(' ')[0]}.</BrutlText>
+            <BrutlText style={styles.dateText}>{todayLabel()} · Day {profile.streakDays > 0 ? profile.streakDays : 1}</BrutlText>
+          </View>
+          <TouchableOpacity onPress={() => router.push('/settings' as any)} hitSlop={12}>
+            <Ionicons name="settings-outline" size={22} color={BrutlColors.textMuted} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Dungeon multiplier */}
         {multiplierActive && (
           <View style={styles.multiplierBanner}>
-            <Ionicons name="shield" size={14} color="#4AE2C4" />
-            <BrutlText variant="caption" style={{ color: '#4AE2C4', flex: 1 }}>
-              DUNGEON COMPLETE — 1.5× XP ACTIVE · {multiplierDaysLeft}d remaining
+            <Ionicons name="shield" size={13} color="#4AE2C4" />
+            <BrutlText style={styles.multiplierText}>
+              1.5× XP ACTIVE — {multiplierDaysLeft}d remaining
             </BrutlText>
           </View>
         )}
 
-        {/* Rank Strip */}
+        {/* Hero Rank Card */}
         <BrutlCard>
-          <View style={styles.rankStrip}>
-            <RankBadge rank={profile.rank} size="lg" />
+          <View style={styles.rankCard}>
+            <RankBadge rank={profile.rank} size="hero" />
             <View style={styles.rankInfo}>
-              <BrutlText variant="display" style={{ fontSize: 28 }}>
-                {profile.rank} — {RANK_TITLES[profile.rank]}
+              <BrutlText variant="display" style={styles.rankTitle}>
+                {profile.rank}
               </BrutlText>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: BrutlSpacing.sm }}>
-                <BrutlText variant="caption">
-                  {profile.streakDays > 0 ? `🔥 ${profile.streakDays} day streak` : '0 day streak'}
-                </BrutlText>
-                {profile.xp > 0 && (
-                  <BrutlText variant="caption" style={{ color: BrutlColors.textDisabled }}>
-                    · {profile.xp.toLocaleString()} XP
-                  </BrutlText>
-                )}
+              <BrutlText style={styles.rankSubtitle}>{RANK_TITLES[profile.rank]}</BrutlText>
+              {profile.streakDays > 0 && (
+                <BrutlText style={styles.streakText}>🔥 {profile.streakDays} day streak</BrutlText>
+              )}
+              <View style={{ marginTop: BrutlSpacing.xs }}>
+                <XPBar
+                  current={xpInRank}
+                  max={xpRange}
+                  nextRankName={nextRankName ?? undefined}
+                />
               </View>
-              <XPBar current={xpInRank} max={xpRange} label="RANK XP" />
             </View>
-            <TouchableOpacity onPress={() => router.push('/settings' as any)} hitSlop={12}>
-              <Ionicons name="settings-outline" size={22} color={BrutlColors.textMuted} />
-            </TouchableOpacity>
           </View>
         </BrutlCard>
 
-        {/* Watch Vitals */}
+        {/* Vitals */}
         <BrutlCard subtle>
-          <BrutlText variant="caption" style={styles.sectionLabel}>VITALS</BrutlText>
-          <View style={styles.vitalsRow}>
-            {[
-              { label: 'HR',       value: vitals.restingHR  ?? '--', unit: 'bpm', color: vitals.restingHR  ? BrutlColors.textPrimary : BrutlColors.textDisabled },
-              { label: 'HRV',      value: vitals.hrv        ?? '--', unit: 'ms',  color: vitals.hrv        ? BrutlColors.textPrimary : BrutlColors.textDisabled },
-              { label: 'SLEEP',    value: vitals.sleepHours ?? '--', unit: 'h',   color: vitals.sleepHours ? (vitals.sleepHours >= 7 ? BrutlColors.success : BrutlColors.accent) : BrutlColors.textDisabled },
-              { label: 'RECOVERY', value: vitals.recoveryScore ?? '--', unit: '%', color: vitals.recoveryScore ? (vitals.recoveryScore >= 70 ? BrutlColors.success : vitals.recoveryScore >= 40 ? BrutlColors.warning : BrutlColors.accent) : BrutlColors.textDisabled },
-            ].map((v) => (
-              <View key={v.label} style={styles.vitalBox}>
-                <BrutlText style={[styles.vitalValue, { color: v.color }]}>{String(v.value)}</BrutlText>
-                <BrutlText variant="caption">{v.unit}</BrutlText>
-                <BrutlText variant="caption" style={{ color: BrutlColors.textMuted }}>{v.label}</BrutlText>
-              </View>
-            ))}
+          <View style={styles.vitalsSectionRow}>
+            <BrutlText style={styles.sectionLabel}>VITALS</BrutlText>
+            {isAvailable && !hasPermission && (
+              <TouchableOpacity
+                onPress={() => router.push('/settings' as any)}
+                style={styles.connectPill}
+              >
+                <BrutlText style={styles.connectPillText}>Connect</BrutlText>
+              </TouchableOpacity>
+            )}
           </View>
-          {isAvailable && !hasPermission && (
-            <BrutlText variant="caption" style={{ color: BrutlColors.accent, textAlign: 'center', marginTop: BrutlSpacing.xs }}>
-              Connect health data in Settings
-            </BrutlText>
+          <View style={styles.vitalsRow}>
+            <VitalRing label="HR"       value={vitals.restingHR}    unit="bpm" color={BrutlColors.accent}  icon="heart" />
+            <VitalRing label="HRV"      value={vitals.hrv}          unit="ms"  color="#4A7BE2"              icon="pulse" />
+            <VitalRing label="SLEEP"    value={vitals.sleepHours}   unit="h"   color={vitals.sleepHours ? (vitals.sleepHours >= 7 ? BrutlColors.success : BrutlColors.warning) : '#555'} icon="moon" />
+            <VitalRing label="RECOVERY" value={vitals.recoveryScore} unit="%"  color={vitals.recoveryScore ? (vitals.recoveryScore >= 70 ? BrutlColors.success : vitals.recoveryScore >= 40 ? BrutlColors.warning : BrutlColors.accent) : '#555'} icon="battery-charging" />
+          </View>
+          {!isAvailable && (
+            <BrutlText style={styles.vitalsNote}>Install Health Connect to enable wearable sync</BrutlText>
+          )}
+          {noVitals && isAvailable && hasPermission && (
+            <BrutlText style={styles.vitalsNote}>Syncs automatically on app open</BrutlText>
           )}
         </BrutlCard>
 
-        {/* Roast Card */}
+        {/* Roast */}
         {!!latestRoast && (
           <BrutlCard>
             <View style={styles.roastBox}>
-              <BrutlText variant="caption" style={styles.sectionLabel}>
+              <BrutlText style={styles.sectionLabel}>
                 {isStreaming ? 'INCOMING ROAST' : "TODAY'S ROAST"}
               </BrutlText>
               <BrutlText variant="body">
@@ -156,7 +204,7 @@ export default function HomeScreen() {
                 {isStreaming && <BrutlText style={styles.cursor}>|</BrutlText>}
               </BrutlText>
               {!!latestCorrection && (
-                <BrutlText variant="accent">→ {latestCorrection}</BrutlText>
+                <BrutlText variant="accent" style={{ marginTop: 4 }}>→ {latestCorrection}</BrutlText>
               )}
             </View>
           </BrutlCard>
@@ -165,23 +213,34 @@ export default function HomeScreen() {
         {/* Active Quests */}
         {activeQuests.length > 0 && (
           <View style={{ gap: BrutlSpacing.sm }}>
-            <BrutlText variant="caption" style={styles.sectionLabel}>ACTIVE QUESTS</BrutlText>
+            <BrutlText style={styles.sectionLabel}>ACTIVE QUESTS</BrutlText>
             {activeQuests.map((q) => (
               <BrutlCard key={q.id} subtle>
                 <View style={styles.questItem}>
-                  <View style={styles.questDot} />
+                  <View style={[styles.questDot, { backgroundColor: q.type === 'BOSS' ? '#E2C44A' : BrutlColors.accent }]} />
                   <View style={styles.questInfo}>
                     <BrutlText variant="body">{q.title}</BrutlText>
-                    <BrutlText variant="caption">{q.description}</BrutlText>
-                    <View style={styles.questProgress}>
+                    <View style={styles.questProgressTrack}>
                       <View style={[styles.questProgressFill, { width: `${Math.round(q.progress * 100)}%` }]} />
                     </View>
                   </View>
-                  <BrutlText variant="accent">+{q.xpReward}</BrutlText>
+                  <BrutlText variant="accent" style={{ fontSize: 13 }}>+{q.xpReward}</BrutlText>
                 </View>
               </BrutlCard>
             ))}
           </View>
+        )}
+
+        {/* Empty quest state */}
+        {activeQuests.length === 0 && !latestRoast && (
+          <BrutlCard subtle>
+            <View style={{ alignItems: 'center', gap: BrutlSpacing.sm, paddingVertical: BrutlSpacing.md }}>
+              <BrutlText variant="display" style={{ fontSize: 32, color: BrutlColors.accent }}>DAY 1.</BrutlText>
+              <BrutlText variant="muted" style={{ textAlign: 'center' }}>
+                Log a workout or meal to start earning XP and unlock quests.
+              </BrutlText>
+            </View>
+          </BrutlCard>
         )}
 
       </ScrollView>
@@ -193,23 +252,51 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BrutlColors.bg },
   scroll: { flex: 1 },
   content: { padding: BrutlSpacing.xl, gap: BrutlSpacing.lg, paddingBottom: BrutlSpacing.xxxl },
-  sectionLabel: { color: BrutlColors.accent, marginBottom: BrutlSpacing.sm },
+
+  header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  greetingText: { fontFamily: 'BebasNeue_400Regular', fontSize: 28, color: BrutlColors.textPrimary, letterSpacing: 1 },
+  dateText: { fontSize: 12, color: BrutlColors.textMuted, marginTop: 2 },
+
   multiplierBanner: {
     flexDirection: 'row', alignItems: 'center', gap: BrutlSpacing.sm,
     backgroundColor: 'rgba(74,226,196,0.08)',
     borderWidth: 1, borderColor: 'rgba(74,226,196,0.25)',
     borderRadius: 8, paddingHorizontal: BrutlSpacing.md, paddingVertical: BrutlSpacing.sm,
   },
-  rankStrip: { flexDirection: 'row', alignItems: 'center', gap: BrutlSpacing.md },
-  rankInfo: { flex: 1, gap: BrutlSpacing.xs },
-  vitalsRow: { flexDirection: 'row', gap: BrutlSpacing.sm },
-  vitalBox: { flex: 1, alignItems: 'center', gap: BrutlSpacing.xs },
-  vitalValue: { fontSize: 22, fontFamily: 'BebasNeue_400Regular' },
+  multiplierText: { fontSize: 12, color: '#4AE2C4', flex: 1, letterSpacing: 0.5 },
+
+  rankCard: { flexDirection: 'row', alignItems: 'center', gap: BrutlSpacing.lg },
+  rankInfo: { flex: 1, gap: 2 },
+  rankTitle: { fontSize: 48, lineHeight: 50, color: BrutlColors.textPrimary },
+  rankSubtitle: { fontSize: 13, color: BrutlColors.textMuted, letterSpacing: 0.5 },
+  streakText: { fontSize: 12, color: BrutlColors.accent, marginTop: 2 },
+
+  sectionLabel: { fontSize: 11, color: BrutlColors.accent, letterSpacing: 1.5, marginBottom: BrutlSpacing.sm },
+  vitalsSectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: BrutlSpacing.sm },
+  connectPill: {
+    backgroundColor: `${BrutlColors.accent}18`,
+    borderRadius: 999, borderWidth: 1, borderColor: `${BrutlColors.accent}50`,
+    paddingHorizontal: 10, paddingVertical: 3,
+  },
+  connectPillText: { fontSize: 11, color: BrutlColors.accent },
+
+  vitalsRow: { flexDirection: 'row', justifyContent: 'space-between', gap: BrutlSpacing.sm },
+  vitalItem: { flex: 1, alignItems: 'center', gap: 6 },
+  vitalRing: {
+    width: 58, height: 58, borderRadius: 29,
+    borderWidth: 2.5, alignItems: 'center', justifyContent: 'center',
+  },
+  vitalVal: { fontFamily: 'BebasNeue_400Regular', fontSize: 18, lineHeight: 20 },
+  vitalUnit: { fontSize: 9, color: BrutlColors.textMuted, marginTop: -2 },
+  vitalLabel: { fontSize: 10, color: BrutlColors.textMuted, letterSpacing: 0.5 },
+  vitalsNote: { fontSize: 11, color: BrutlColors.textDisabled, textAlign: 'center', marginTop: BrutlSpacing.sm },
+
   roastBox: { gap: BrutlSpacing.sm },
   cursor: { color: BrutlColors.accent, fontWeight: '700' },
+
   questItem: { flexDirection: 'row', alignItems: 'center', gap: BrutlSpacing.md },
-  questDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: BrutlColors.accent },
-  questInfo: { flex: 1, gap: BrutlSpacing.xs },
-  questProgress: { height: 3, backgroundColor: BrutlColors.border, borderRadius: 9999, overflow: 'hidden' },
+  questDot: { width: 8, height: 8, borderRadius: 4 },
+  questInfo: { flex: 1, gap: 6 },
+  questProgressTrack: { height: 3, backgroundColor: BrutlColors.border, borderRadius: 9999, overflow: 'hidden' },
   questProgressFill: { position: 'absolute', top: 0, bottom: 0, left: 0, backgroundColor: BrutlColors.accent },
 });

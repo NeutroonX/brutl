@@ -9,6 +9,7 @@ interface XPBarProps {
   max: number;
   label?: string;
   showNumbers?: boolean;
+  nextRankName?: string;
 }
 
 const styles = StyleSheet.create({
@@ -34,7 +35,7 @@ const styles = StyleSheet.create({
   },
 });
 
-export function XPBar({ current, max, label, showNumbers = true }: XPBarProps) {
+export function XPBar({ current, max, label, showNumbers = true, nextRankName }: XPBarProps) {
   const progress = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
   const pct = max > 0 ? Math.min(1, current / max) : 0;
@@ -76,8 +77,10 @@ export function XPBar({ current, max, label, showNumbers = true }: XPBarProps) {
           {label && <BrutlText variant="caption">{label}</BrutlText>}
           {showNumbers && (
             <BrutlText variant="caption" style={isNearRankUp ? { color: BrutlColors.accent } : {}}>
-              {current.toLocaleString()} / {max.toLocaleString()} XP
-              {isNearRankUp ? ' ⚡' : ''}
+              {nextRankName
+                ? `${(max - current).toLocaleString()} XP to ${nextRankName}${isNearRankUp ? ' ⚡' : ''}`
+                : `${current.toLocaleString()} / ${max.toLocaleString()} XP${isNearRankUp ? ' ⚡' : ''}`
+              }
             </BrutlText>
           )}
         </View>

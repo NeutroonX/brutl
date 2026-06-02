@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { BrutlCard } from '@/components/ui/BrutlCard';
 import { BrutlText } from '@/components/ui/BrutlText';
+import { MacroBar } from '@/components/ui/MacroBar';
 import { BarcodeScanModal, type ScannedFood } from '@/components/BarcodeScanModal';
 import { PhotoScanModal } from '@/components/PhotoScanModal';
 import { ScanConfirmSheet } from '@/components/ScanConfirmSheet';
@@ -58,6 +59,7 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { padding: BrutlSpacing.xl, gap: BrutlSpacing.lg, paddingBottom: BrutlSpacing.xxxl },
   sectionLabel: { color: BrutlColors.accent, marginBottom: BrutlSpacing.sm },
+  macroGrid: { gap: BrutlSpacing.md },
   searchRow: { flexDirection: 'row', gap: BrutlSpacing.sm, alignItems: 'center' },
   input: {
     flex: 1,
@@ -164,24 +166,21 @@ export default function DietScreen() {
           </View>
         </View>
 
-        {/* Daily Macros Summary */}
+        {/* Daily Macros — visual bars */}
         {targets && (
           <BrutlCard>
             <BrutlText variant="caption" style={styles.sectionLabel}>TODAY'S MACROS</BrutlText>
-            <View style={styles.macroRow}>
-              {[
-                { label: 'KCAL', val: todayLog?.totalCalories ?? 0, target: targets.calories },
-                { label: 'PROTEIN', val: Math.round(todayLog?.totalProteinG ?? 0), target: targets.proteinG },
-                { label: 'CARBS', val: Math.round(todayLog?.totalCarbsG ?? 0), target: targets.carbsG },
-                { label: 'FAT', val: Math.round(todayLog?.totalFatG ?? 0), target: targets.fatG },
-              ].map((m) => (
-                <View key={m.label} style={styles.macroBox}>
-                  <BrutlText style={styles.macroValue}>{m.val}</BrutlText>
-                  <BrutlText variant="caption">/ {m.target}</BrutlText>
-                  <BrutlText variant="caption" style={{ color: BrutlColors.textMuted }}>{m.label}</BrutlText>
-                </View>
-              ))}
+            <View style={styles.macroGrid}>
+              <MacroBar label="CALORIES" value={todayLog?.totalCalories ?? 0} target={targets.calories} unit="kcal" color={BrutlColors.textPrimary} />
+              <MacroBar label="PROTEIN"  value={Math.round(todayLog?.totalProteinG ?? 0)} target={targets.proteinG} unit="g" color={BrutlColors.accent} />
+              <MacroBar label="CARBS"    value={Math.round(todayLog?.totalCarbsG ?? 0)} target={targets.carbsG} unit="g" color="#E2C44A" />
+              <MacroBar label="FAT"      value={Math.round(todayLog?.totalFatG ?? 0)} target={targets.fatG} unit="g" color="#4A7BE2" />
             </View>
+            {!todayLog && (
+              <BrutlText style={{ fontSize: 11, color: BrutlColors.textDisabled, textAlign: 'center', marginTop: BrutlSpacing.sm }}>
+                Log your first meal to start tracking
+              </BrutlText>
+            )}
           </BrutlCard>
         )}
 
