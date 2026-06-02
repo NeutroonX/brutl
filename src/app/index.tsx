@@ -153,12 +153,6 @@ export default function HomeScreen() {
               borderColor: BrutlColors.borderVisible,
               overflow: 'hidden',
             }]}>
-              {/* Rank color left accent strip */}
-              <View style={{
-                position: 'absolute', left: 0, top: 0, bottom: 0,
-                width: 3, backgroundColor: rankColor,
-              }} />
-
               {/* Huge background rank letter */}
               <View style={{
                 position: 'absolute', right: -12, top: -28,
@@ -175,7 +169,7 @@ export default function HomeScreen() {
               </View>
 
               {/* Content */}
-              <View style={{ padding: BrutlSpacing.lg, paddingLeft: BrutlSpacing.lg + 6, gap: BrutlSpacing.sm }}>
+              <View style={{ padding: BrutlSpacing.lg, gap: BrutlSpacing.sm }}>
                 {/* Top row */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <BrutlText style={{ fontSize: 11, color: rankColor, letterSpacing: 2.5 }}>
