@@ -50,9 +50,9 @@ function ExercisePicker({
   onClose: () => void;
 }) {
   const [query, setQuery] = useState('');
-  const results = query.trim()
-    ? searchExercises(query, currentNames)
-    : getSuggestedExercises(currentNames);
+  const trimmed = query.trim();
+  const results = trimmed ? searchExercises(trimmed, currentNames) : getSuggestedExercises(currentNames);
+  const showCustom = trimmed.length > 1 && !results.some((r) => r.name.toLowerCase() === trimmed.toLowerCase());
 
   const grouped = results.reduce<Record<string, typeof results>>((acc, ex) => {
     (acc[ex.category] = acc[ex.category] ?? []).push(ex);
@@ -69,7 +69,7 @@ function ExercisePicker({
               style={st.epSearchInput}
               value={query}
               onChangeText={setQuery}
-              placeholder="Search exercises..."
+              placeholder="Search or type any exercise..."
               placeholderTextColor={BrutlColors.textDisabled}
               autoFocus
             />
@@ -77,12 +77,22 @@ function ExercisePicker({
               <BrutlText style={st.epCloseBtn}>✕</BrutlText>
             </TouchableOpacity>
           </View>
-          {!query.trim() && (
+          {!trimmed && (
             <BrutlText style={st.epHint}>
               {currentNames.length > 0 ? 'SUGGESTED FOR YOUR SPLIT' : 'ALL EXERCISES'}
             </BrutlText>
           )}
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {/* Custom / unknown exercise */}
+            {showCustom && (
+              <TouchableOpacity
+                style={[st.epExRow, { borderBottomColor: BrutlColors.accentDim }]}
+                onPress={() => { onSelect(trimmed); onClose(); }}
+              >
+                <BrutlText style={[st.epExName, { color: BrutlColors.accent }]}>+ Add "{trimmed}"</BrutlText>
+                <BrutlText style={[st.epAiBadgeTxt, { color: BrutlColors.textDisabled }]}>Custom</BrutlText>
+              </TouchableOpacity>
+            )}
             {Object.entries(grouped).map(([cat, items]) => (
               <View key={cat}>
                 <BrutlText style={st.epCatLabel}>{cat.toUpperCase()}</BrutlText>
@@ -98,6 +108,72 @@ function ExercisePicker({
                         <BrutlText style={st.epAiBadgeTxt}>AI</BrutlText>
                       </View>
                     )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Routines Sheet ───────────────────────────────────────────────────────────
+
+function RoutinesSheet({
+  onLoadDay,
+  onClose,
+}: {
+  onLoadDay: (dayName: string, exercises: { name: string; sets: number; reps: string; weight?: number }[]) => void;
+  onClose: () => void;
+}) {
+  const splits = useRoutineStore((s) => s.splits);
+  const [expandedSplit, setExpandedSplit] = useState<string | null>(splits[0]?.id ?? null);
+
+  return (
+    <Modal transparent animationType="slide" onRequestClose={onClose}>
+      <View style={st.epBackdrop}>
+        <View style={[st.epSheet, { maxHeight: '80%' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: BrutlSpacing.md }}>
+            <BrutlText style={[st.epHint, { flex: 1, fontSize: 14, color: BrutlColors.textPrimary, fontFamily: BrutlFonts.display, letterSpacing: 1 }]}>
+              ROUTINES
+            </BrutlText>
+            <TouchableOpacity onPress={onClose}>
+              <BrutlText style={st.epCloseBtn}>✕</BrutlText>
+            </TouchableOpacity>
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {splits.map((split) => (
+              <View key={split.id} style={st.rSplit}>
+                <TouchableOpacity
+                  style={st.rSplitHeader}
+                  onPress={() => setExpandedSplit(expandedSplit === split.id ? null : split.id)}
+                >
+                  <BrutlText style={st.rSplitName}>{split.name}</BrutlText>
+                  <BrutlText style={st.rSplitMeta}>{split.days.length} days</BrutlText>
+                  <Ionicons
+                    name={expandedSplit === split.id ? 'chevron-up' : 'chevron-down'}
+                    size={13}
+                    color={BrutlColors.textDisabled}
+                  />
+                </TouchableOpacity>
+                {expandedSplit === split.id && split.days.map((day) => (
+                  <TouchableOpacity
+                    key={day.id}
+                    style={st.rDay}
+                    onPress={() => {
+                      onLoadDay(day.name, day.exercises.map((e) => ({ name: e.name, sets: e.targetSets, reps: e.targetReps, weight: e.targetWeightKg })));
+                      onClose();
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <BrutlText style={st.rDayName}>{day.name}</BrutlText>
+                      <BrutlText style={st.rDayEx}>{day.exercises.map((e) => e.name).join(' · ')}</BrutlText>
+                    </View>
+                    <View style={st.rStartBtn}>
+                      <BrutlText style={st.rStartTxt}>START</BrutlText>
+                    </View>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -499,6 +575,7 @@ export default function WorkoutScreen() {
 
   const [exercises, setExercises] = useState<LiveExercise[]>([]);
   const [showPicker, setShowPicker] = useState(false);
+  const [showRoutines, setShowRoutines] = useState(false);
   const [elapsedSecs, setElapsedSecs] = useState(0);
   const [restSecs, setRestSecs] = useState<number | null>(null);
   const [infoSheet, setInfoSheet] = useState<string | null>(null);
@@ -557,6 +634,25 @@ export default function WorkoutScreen() {
   const sessionXP = exercises.reduce((total, ex) =>
     total + ex.sets.filter((s) => s.done).reduce((s, set) =>
       s + Math.max(1, Math.round((parseFloat(set.weightKg) || 0) * (parseInt(set.reps) || 0) / 100)), 0), 0);
+
+  function handleLoadDay(dayName: string, exList: { name: string; sets: number; reps: string; weight?: number }[]) {
+    const lastSession = recentLogs[0];
+    const loaded: LiveExercise[] = exList.map((re) => {
+      const lastEx = lastSession?.exercises.find((e) => e.exercise.toLowerCase() === re.name.toLowerCase());
+      return {
+        name: re.name,
+        sets: Array.from({ length: re.sets }, () => ({
+          weightKg: lastEx ? String(lastEx.weightKg) : (re.weight ? String(re.weight) : '60'),
+          reps: lastEx ? String(lastEx.reps) : re.reps.split('-')[0],
+          done: false,
+        })),
+        prBeaten: false,
+        roastText: null,
+        notes: '',
+      };
+    });
+    setExercises(loaded);
+  }
 
   function addExercise(name: string) {
     if (!name.trim()) return;
@@ -700,6 +796,10 @@ export default function WorkoutScreen() {
           <BrutlText style={st.headerSplit}>{splitName}</BrutlText>
           <BrutlText style={st.headerSub}>Strength & Size · Week {week}</BrutlText>
         </View>
+        <TouchableOpacity style={st.routinesBtn} onPress={() => setShowRoutines(true)}>
+          <Ionicons name="copy-outline" size={13} color={BrutlColors.textMuted} />
+          <BrutlText style={st.routinesBtnTxt}>ROUTINES</BrutlText>
+        </TouchableOpacity>
         <View style={st.headerRight}>
           <BrutlText style={st.headerTimer}>{formatTime(elapsedSecs)}</BrutlText>
           <BrutlText style={st.headerVolume}>{Math.round(curVolume)}kg total</BrutlText>
@@ -796,6 +896,14 @@ export default function WorkoutScreen() {
         />
       </View>
 
+      {/* Routines sheet */}
+      {showRoutines && (
+        <RoutinesSheet
+          onLoadDay={handleLoadDay}
+          onClose={() => setShowRoutines(false)}
+        />
+      )}
+
       {/* Exercise picker */}
       {showPicker && (
         <ExercisePicker
@@ -843,6 +951,8 @@ const st = StyleSheet.create({
     letterSpacing: 1,
   },
   headerSub: { fontSize: 10, color: '#555555', marginTop: 1 },
+  routinesBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: BrutlRadius.sm, borderWidth: 1, borderColor: BrutlColors.border },
+  routinesBtnTxt: { fontSize: 9, color: BrutlColors.textMuted, fontFamily: BrutlFonts.display, letterSpacing: 1 },
   headerRight: { alignItems: 'flex-end', gap: 2 },
   headerTimer: { fontSize: 14, color: BrutlColors.accent, fontFamily: BrutlFonts.mono },
   headerVolume: { fontSize: 10, color: BrutlColors.textMuted },
@@ -1039,6 +1149,17 @@ const st = StyleSheet.create({
     alignItems: 'center',
   },
   sheetCloseTxt: { fontSize: 12, color: BrutlColors.textMuted, fontFamily: BrutlFonts.display, letterSpacing: 1 },
+
+  // Routines sheet
+  rSplit: { borderBottomWidth: 0.5, borderBottomColor: BrutlColors.border },
+  rSplitHeader: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 6 },
+  rSplitName: { flex: 1, fontFamily: BrutlFonts.display, fontSize: 15, color: BrutlColors.textPrimary, letterSpacing: 0.5 },
+  rSplitMeta: { fontSize: 10, color: BrutlColors.textDisabled },
+  rDay: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingLeft: BrutlSpacing.md, gap: 8 },
+  rDayName: { fontSize: 12, color: BrutlColors.textPrimary, fontFamily: BrutlFonts.display, letterSpacing: 0.3, marginBottom: 2 },
+  rDayEx: { fontSize: 10, color: BrutlColors.textDisabled },
+  rStartBtn: { backgroundColor: BrutlColors.accent, borderRadius: BrutlRadius.sm, paddingHorizontal: 10, paddingVertical: 4 },
+  rStartTxt: { color: '#fff', fontSize: 9, fontFamily: BrutlFonts.display, letterSpacing: 1 },
 
   // Exercise picker (ep namespace used inline)
   epBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
