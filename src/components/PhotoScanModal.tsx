@@ -1,6 +1,13 @@
 import { useRef, useState } from 'react';
 import { ActivityIndicator, Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+// Lazy-guard native module
+let CameraView: any = null;
+let useCameraPermissions: () => [any, () => Promise<any>] = () => [null, async () => ({ granted: false })];
+try {
+  const cam = require('expo-camera');
+  CameraView = cam.CameraView;
+  useCameraPermissions = cam.useCameraPermissions;
+} catch { /* native module not in this build */ }
 
 import { BrutlButton } from './ui/BrutlButton';
 import { BrutlText } from './ui/BrutlText';
@@ -83,7 +90,7 @@ export function PhotoScanModal({ visible, onResult, onClose }: Props) {
   const [permission, requestPermission] = useCameraPermissions();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const cameraRef = useRef<CameraView>(null);
+  const cameraRef = useRef<any>(null);
 
   async function handleCapture() {
     if (!cameraRef.current || loading) return;
@@ -105,6 +112,20 @@ export function PhotoScanModal({ visible, onResult, onClose }: Props) {
   }
 
   if (!visible) return null;
+
+  if (!CameraView) {
+    return (
+      <Modal visible transparent animationType="slide" statusBarTranslucent>
+        <View style={[styles.overlay, styles.permissionBox]}>
+          <BrutlText variant="heading" style={{ textAlign: 'center' }}>Camera Not Available</BrutlText>
+          <BrutlText variant="muted" style={{ textAlign: 'center' }}>
+            This feature requires a newer build. Use the preview APK from EAS.
+          </BrutlText>
+          <BrutlButton label="CLOSE" onPress={onClose} />
+        </View>
+      </Modal>
+    );
+  }
 
   if (!permission?.granted) {
     return (
