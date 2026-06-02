@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 import { STORAGE_KEYS, storageGet, storageSet } from '@/lib/storage';
 import { getRankFromXP } from '@/lib/rank';
+import { calcStreakBonus } from '@/lib/xp';
 import type { Goal, MacroTargets, Rank, UserProfile, WeakArea } from '@/types';
 
 interface UserState {
@@ -108,8 +109,15 @@ export const useUserStore = create<UserState>((set, get) => ({
     if (lastOpen === yesterday) {
       // consecutive day — increment streak
       const newStreak = profile.streakDays + 1;
-      const updated = { ...profile, streakDays: newStreak };
-      set({ profile: updated });
+      const bonus = calcStreakBonus(newStreak);
+      const newXP = Math.max(0, profile.xp + bonus);
+      const newRank = getRankFromXP(newXP);
+      const rankChanged = newRank !== profile.rank;
+      const updated = { ...profile, streakDays: newStreak, xp: newXP, rank: newRank };
+      set({
+        profile: updated,
+        pendingRankUp: rankChanged ? newRank : get().pendingRankUp,
+      });
       await storageSet(STORAGE_KEYS.user, updated);
     } else if (lastOpen !== null && lastOpen !== today) {
       // missed a day — reset streak to 1

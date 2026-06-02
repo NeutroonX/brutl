@@ -22,13 +22,15 @@ export default function HomeScreen() {
   const clearPendingRankUp = useUserStore((s) => s.clearPendingRankUp);
   const checkAndUpdateStreak = useUserStore((s) => s.checkAndUpdateStreak);
   const { currentRoast, correctionText, isStreaming, log: roastLog } = useRoastStore();
+  const refreshDailyQuests = useQuestStore((s) => s.refreshDailyQuests);
   const quests = useQuestStore((s) => s.quests);
-  const activeQuests = quests.filter((q) => !q.completedAt).slice(0, 2);
+  const activeQuests = quests.filter((q) => !q.completedAt && q.expiresAt > Date.now()).slice(0, 2);
   const { vitals, syncVitals, hasPermission, isAvailable } = useWatchStore();
 
   useEffect(() => {
     if (!profile) return;
     checkAndUpdateStreak().catch(() => {});
+    refreshDailyQuests().catch(() => {});
     const init = async () => {
       try {
         if (isAvailable && hasPermission) await syncVitals();
@@ -39,8 +41,12 @@ export default function HomeScreen() {
         sleepHours: v.sleepHours ?? 0, recoveryScore: v.recoveryScore ?? 0,
         stressLevel: 0, steps: v.steps ?? 0, caloriesBurned: 0, source: 'WEAR_OS' as const,
       } : null;
-      const payload = buildRoastPayload('APP_OPEN', profile.rank, profile.streakDays, watchData);
-      streamRoast(payload).catch(() => {});
+      // Fire POOR_RECOVERY roast if recovery score is critically low
+      if (v.recoveryScore !== null && v.recoveryScore < 40) {
+        streamRoast(buildRoastPayload('POOR_RECOVERY', profile.rank, profile.streakDays, watchData)).catch(() => {});
+      } else {
+        streamRoast(buildRoastPayload('APP_OPEN', profile.rank, profile.streakDays, watchData)).catch(() => {});
+      }
     };
     init();
   }, []);

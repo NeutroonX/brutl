@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 
 import { STORAGE_KEYS, storageGet, storageSet } from '@/lib/storage';
+import { useQuestStore } from '@/stores/quest.store';
+import { useUserStore } from '@/stores/user.store';
 import type { DietLog, MealEntry } from '@/types';
 
 interface DietState {
@@ -50,6 +52,16 @@ export const useDietStore = create<DietState>((set, get) => ({
       : [updated, ...logs];
     set({ logs: updatedLogs, todayLog: updated });
     await storageSet(STORAGE_KEYS.dietLog, updatedLogs);
+
+    // Progress daily quest by 50% when protein target is >= 80% hit
+    const profile = useUserStore.getState().profile;
+    if (profile) {
+      const target = profile.macroTargets.proteinG;
+      const ratio = target > 0 ? macros.totalProteinG / target : 0;
+      if (ratio >= 0.8) {
+        await useQuestStore.getState().progressActiveQuest('DAILY', 0.5).catch(() => {});
+      }
+    }
   },
 
   getTodayCompliance: () => {

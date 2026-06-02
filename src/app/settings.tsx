@@ -1,15 +1,32 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import {
+  Alert, Modal, KeyboardAvoidingView, Platform,
+  ScrollView, StyleSheet, TextInput, TouchableOpacity, View,
+} from 'react-native';
 
 import { BrutlCard } from '@/components/ui/BrutlCard';
 import { BrutlButton } from '@/components/ui/BrutlButton';
 import { BrutlText } from '@/components/ui/BrutlText';
 import { Ionicons } from '@expo/vector-icons';
-import { BrutlColors, BrutlSpacing, BrutlRadius } from '@/constants/theme';
+import { BrutlColors, BrutlFonts, BrutlRadius, BrutlSpacing } from '@/constants/theme';
 import { useUserStore } from '@/stores/user.store';
 import { useWatchStore } from '@/stores/watch.store';
 import { storageRemove, STORAGE_KEYS } from '@/lib/storage';
+import type { Goal, WeakArea } from '@/types';
+
+const GOALS: { value: Goal; label: string }[] = [
+  { value: 'FAT_LOSS', label: 'Fat Loss' },
+  { value: 'MUSCLE_GAIN', label: 'Muscle Gain' },
+  { value: 'RECOMP', label: 'Both' },
+];
+
+const WEAK_AREAS: { value: WeakArea; label: string }[] = [
+  { value: 'UPPER', label: 'Upper Body' },
+  { value: 'LOWER', label: 'Lower Body' },
+  { value: 'CARDIO', label: 'Cardio' },
+  { value: 'DIET', label: 'Diet' },
+];
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BrutlColors.bg },
@@ -31,11 +48,9 @@ const styles = StyleSheet.create({
   },
   rowLeft: { flexDirection: 'row', alignItems: 'center', gap: BrutlSpacing.md, flex: 1 },
   iconBox: {
-    width: 36,
-    height: 36,
+    width: 36, height: 36,
     borderRadius: BrutlRadius.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
     backgroundColor: BrutlColors.bgCard,
   },
   divider: { height: 1, backgroundColor: BrutlColors.border, marginVertical: BrutlSpacing.xs },
@@ -47,22 +62,47 @@ const styles = StyleSheet.create({
     padding: BrutlSpacing.md,
     alignItems: 'center',
   },
+  // Edit profile modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'flex-end' },
+  modalSheet: {
+    backgroundColor: BrutlColors.bgCard,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: BrutlSpacing.xl,
+    gap: BrutlSpacing.md,
+    paddingBottom: BrutlSpacing.xxxl,
+  },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: BrutlSpacing.sm },
+  input: {
+    backgroundColor: BrutlColors.bg,
+    borderRadius: BrutlRadius.sm,
+    borderWidth: 1,
+    borderColor: BrutlColors.borderVisible,
+    color: BrutlColors.textPrimary,
+    fontFamily: BrutlFonts.body,
+    fontSize: 15,
+    paddingHorizontal: BrutlSpacing.md,
+    paddingVertical: BrutlSpacing.sm,
+  },
+  fieldLabel: { color: BrutlColors.textMuted, marginBottom: 4, fontSize: 11, letterSpacing: 1 },
+  optionRow: { flexDirection: 'row', gap: BrutlSpacing.sm, flexWrap: 'wrap' },
+  option: {
+    paddingHorizontal: BrutlSpacing.md,
+    paddingVertical: BrutlSpacing.sm,
+    borderRadius: BrutlRadius.sm,
+    borderWidth: 1,
+    borderColor: BrutlColors.borderVisible,
+  },
+  optionSelected: { backgroundColor: BrutlColors.accent, borderColor: BrutlColors.accent },
 });
 
 function SettingsRow({
-  icon,
-  label,
-  sublabel,
-  onPress,
-  right,
+  icon, label, sublabel, onPress, right,
 }: {
-  icon: string;
-  label: string;
-  sublabel?: string;
-  onPress?: () => void;
-  right?: React.ReactNode;
+  icon: string; label: string; sublabel?: string;
+  onPress?: () => void; right?: React.ReactNode;
 }) {
-  const content = (
+  const inner = (
     <View style={styles.row}>
       <View style={styles.rowLeft}>
         <View style={styles.iconBox}>
@@ -76,17 +116,96 @@ function SettingsRow({
       {right ?? (onPress && <Ionicons name="chevron-forward" size={16} color={BrutlColors.textDisabled} />)}
     </View>
   );
+  if (onPress) return <TouchableOpacity onPress={onPress} activeOpacity={0.7}>{inner}</TouchableOpacity>;
+  return inner;
+}
 
-  if (onPress) {
-    return <TouchableOpacity onPress={onPress} activeOpacity={0.7}>{content}</TouchableOpacity>;
+function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const profile = useUserStore((s) => s.profile);
+  const setProfile = useUserStore((s) => s.setProfile);
+  const [name, setName] = useState(profile?.name ?? '');
+  const [weightKg, setWeightKg] = useState(String(profile?.weightKg ?? ''));
+  const [heightCm, setHeightCm] = useState(String(profile?.heightCm ?? ''));
+  const [goal, setGoal] = useState<Goal>(profile?.goal ?? 'FAT_LOSS');
+  const [weakArea, setWeakArea] = useState<WeakArea>(profile?.weakArea ?? 'DIET');
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    if (!profile || !name.trim()) return;
+    setSaving(true);
+    await setProfile({
+      ...profile,
+      name: name.trim(),
+      weightKg: parseFloat(weightKg) || profile.weightKg,
+      heightCm: parseInt(heightCm) || profile.heightCm,
+      goal,
+      weakArea,
+    });
+    setSaving(false);
+    onClose();
   }
-  return content;
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={onClose}>
+      <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={styles.modalSheet}>
+          <View style={styles.modalHeader}>
+            <BrutlText variant="heading" style={{ fontSize: 20 }}>Edit Profile</BrutlText>
+            <TouchableOpacity onPress={onClose} hitSlop={12}>
+              <Ionicons name="close" size={22} color={BrutlColors.textMuted} />
+            </TouchableOpacity>
+          </View>
+
+          <View>
+            <BrutlText style={styles.fieldLabel}>NAME</BrutlText>
+            <TextInput style={styles.input} value={name} onChangeText={setName} placeholderTextColor={BrutlColors.textDisabled} placeholder="Your name" />
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: BrutlSpacing.sm }}>
+            <View style={{ flex: 1 }}>
+              <BrutlText style={styles.fieldLabel}>WEIGHT (KG)</BrutlText>
+              <TextInput style={styles.input} value={weightKg} onChangeText={setWeightKg} keyboardType="decimal-pad" placeholderTextColor={BrutlColors.textDisabled} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <BrutlText style={styles.fieldLabel}>HEIGHT (CM)</BrutlText>
+              <TextInput style={styles.input} value={heightCm} onChangeText={setHeightCm} keyboardType="number-pad" placeholderTextColor={BrutlColors.textDisabled} />
+            </View>
+          </View>
+
+          <View>
+            <BrutlText style={styles.fieldLabel}>GOAL</BrutlText>
+            <View style={styles.optionRow}>
+              {GOALS.map((g) => (
+                <TouchableOpacity key={g.value} style={[styles.option, goal === g.value && styles.optionSelected]} onPress={() => setGoal(g.value)}>
+                  <BrutlText variant="caption">{g.label}</BrutlText>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View>
+            <BrutlText style={styles.fieldLabel}>WEAKEST AREA</BrutlText>
+            <View style={styles.optionRow}>
+              {WEAK_AREAS.map((w) => (
+                <TouchableOpacity key={w.value} style={[styles.option, weakArea === w.value && styles.optionSelected]} onPress={() => setWeakArea(w.value)}>
+                  <BrutlText variant="caption">{w.label}</BrutlText>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <BrutlButton label={saving ? 'SAVING…' : 'SAVE CHANGES'} onPress={handleSave} disabled={saving || !name.trim()} loading={saving} />
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
 }
 
 export default function SettingsScreen() {
   const profile = useUserStore((s) => s.profile);
   const { hasPermission, isAvailable, requestPermissions } = useWatchStore();
   const [requesting, setRequesting] = useState(false);
+  const [editVisible, setEditVisible] = useState(false);
 
   async function handleGrantHealthConnect() {
     setRequesting(true);
@@ -107,17 +226,10 @@ export default function SettingsScreen() {
           text: 'Reset',
           style: 'destructive',
           onPress: async () => {
-            await Promise.all([
-              storageRemove(STORAGE_KEYS.user),
-              storageRemove(STORAGE_KEYS.hasOnboarded),
-              storageRemove(STORAGE_KEYS.roastLog),
-              storageRemove(STORAGE_KEYS.workoutLog),
-              storageRemove(STORAGE_KEYS.dietLog),
-              storageRemove(STORAGE_KEYS.quests),
-              storageRemove(STORAGE_KEYS.watchVitals),
-              storageRemove(STORAGE_KEYS.lastOpenDate),
-            ]);
-            router.replace('/onboarding/cold-open');
+            await Promise.all(
+              Object.values(STORAGE_KEYS).map((k) => storageRemove(k))
+            );
+            router.replace('/onboarding/cold-open' as any);
           },
         },
       ]
@@ -126,18 +238,16 @@ export default function SettingsScreen() {
 
   const healthStatusColor = !isAvailable
     ? BrutlColors.textDisabled
-    : hasPermission
-    ? BrutlColors.success
-    : BrutlColors.warning;
+    : hasPermission ? BrutlColors.success : BrutlColors.warning;
 
   const healthStatusLabel = !isAvailable
     ? 'Not available'
-    : hasPermission
-    ? 'Connected'
-    : 'Permission needed';
+    : hasPermission ? 'Connected' : 'Permission needed';
 
   return (
     <View style={styles.container}>
+      <EditProfileModal visible={editVisible} onClose={() => setEditVisible(false)} />
+
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={12}>
           <Ionicons name="arrow-back" size={24} color={BrutlColors.textPrimary} />
@@ -151,7 +261,13 @@ export default function SettingsScreen() {
         {!!profile && (
           <BrutlCard>
             <BrutlText variant="caption" style={styles.sectionLabel}>PROFILE</BrutlText>
-            <SettingsRow icon="person-outline" label={profile.name} sublabel={`${profile.age} yrs · ${profile.weightKg}kg · ${profile.heightCm}cm`} />
+            <SettingsRow
+              icon="person-outline"
+              label={profile.name}
+              sublabel={`${profile.age} yrs · ${profile.weightKg}kg · ${profile.heightCm}cm`}
+              onPress={() => setEditVisible(true)}
+              right={<BrutlText variant="caption" style={{ color: BrutlColors.accent }}>Edit</BrutlText>}
+            />
             <View style={styles.divider} />
             <SettingsRow icon="flag-outline" label="Goal" sublabel={profile.goal.replace('_', ' ')} />
             <View style={styles.divider} />
@@ -173,7 +289,7 @@ export default function SettingsScreen() {
               <View style={styles.divider} />
               <View style={{ paddingTop: BrutlSpacing.sm }}>
                 <BrutlText variant="caption" style={{ color: BrutlColors.textMuted, marginBottom: BrutlSpacing.sm }}>
-                  Grant access to heart rate, HRV, sleep, and steps from your Samsung watch or any Health Connect source.
+                  Grant access to heart rate, HRV, sleep, and steps from Samsung Health or any Health Connect source.
                 </BrutlText>
                 <BrutlButton
                   label={requesting ? 'REQUESTING…' : 'GRANT HEALTH ACCESS'}
@@ -206,9 +322,9 @@ export default function SettingsScreen() {
           <BrutlText variant="caption" style={styles.sectionLabel}>ABOUT</BrutlText>
           <SettingsRow icon="trophy-outline" label="Rank System" sublabel="E → D → C → B → A → S" />
           <View style={styles.divider} />
-          <SettingsRow icon="flame-outline" label="Streak" sublabel="Opens app daily to maintain" />
+          <SettingsRow icon="flame-outline" label="Streak Bonus" sublabel="+250 XP at 7 days · +500 at 30 · +1500 at 90" />
           <View style={styles.divider} />
-          <SettingsRow icon="chatbubble-outline" label="Roast Engine" sublabel="Powered by NVIDIA Nemotron via OpenRouter" />
+          <SettingsRow icon="chatbubble-outline" label="Roast Engine" sublabel="NVIDIA Nemotron via OpenRouter" />
         </BrutlCard>
 
         {/* Danger Zone */}

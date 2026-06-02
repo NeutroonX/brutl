@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import { STORAGE_KEYS, storageGet, storageSet } from '@/lib/storage';
+import { useQuestStore } from '@/stores/quest.store';
 import type { ExerciseSet, WorkoutLog } from '@/types';
 
 interface WorkoutState {
@@ -25,6 +26,23 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     const updated = [entry, ...get().logs];
     set({ logs: updated });
     await storageSet(STORAGE_KEYS.workoutLog, updated);
+
+    // Progress daily quest by 50% for logging a workout
+    const questStore = useQuestStore.getState();
+    await questStore.progressActiveQuest('DAILY', 0.5).catch(() => {});
+
+    // Complete boss quest if any exercise beats its baseline
+    const bossQuest = questStore.getActiveByType('BOSS');
+    if (bossQuest) {
+      for (const ex of exercises) {
+        const baseline = get().getBaselineForExercise(ex.exercise);
+        if (baseline > 0 && ex.weightKg > baseline) {
+          await questStore.progressActiveQuest('BOSS', 1).catch(() => {});
+          break;
+        }
+      }
+    }
+
     return entry;
   },
 
@@ -39,8 +57,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       l.exercises.filter((e) => e.exercise.toLowerCase() === exercise.toLowerCase())
     );
     if (matches.length === 0) return 0;
-    const avgWeight = matches.reduce((sum, e) => sum + e.weightKg, 0) / matches.length;
-    return avgWeight;
+    return matches.reduce((sum, e) => sum + e.weightKg, 0) / matches.length;
   },
 
   loadFromStorage: async () => {
