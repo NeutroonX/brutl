@@ -28,6 +28,7 @@ import {
   getWeekNumber,
   searchExercises,
   getSuggestedExercises,
+  cacheExerciseProfile,
 } from '@/lib/workout-ai';
 import { calcWorkoutXP } from '@/lib/xp';
 import { useDungeonStore } from '@/stores/dungeon.store';
@@ -40,6 +41,9 @@ const SCREEN_H = Dimensions.get('window').height;
 
 // ─── AI Exercise Picker ───────────────────────────────────────────────────────
 
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+const SUPABASE_ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+
 function ExercisePicker({
   currentNames,
   onSelect,
@@ -50,11 +54,42 @@ function ExercisePicker({
   onClose: () => void;
 }) {
   const [query, setQuery] = useState('');
-  const trimmed = query.trim();
-  const results = trimmed ? searchExercises(trimmed, currentNames) : getSuggestedExercises(currentNames);
-  const showCustom = trimmed.length > 1 && !results.some((r) => r.name.toLowerCase() === trimmed.toLowerCase());
+  const [aiResult, setAiResult] = useState<{ name: string; category: string } | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const grouped = results.reduce<Record<string, typeof results>>((acc, ex) => {
+  const trimmed = query.trim();
+  const localResults = trimmed ? searchExercises(trimmed, currentNames) : getSuggestedExercises(currentNames);
+  const noLocalMatch = trimmed.length >= 3 && !localResults.some((r) => r.name.toLowerCase() === trimmed.toLowerCase());
+
+  // Debounced AI lookup for unknown exercises
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!noLocalMatch) { setAiResult(null); setAiLoading(false); return; }
+
+    setAiLoading(true);
+    setAiResult(null);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/exercise-ai`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON}` },
+          body: JSON.stringify({ exercise: trimmed }),
+        });
+        if (res.ok) {
+          const profile = await res.json();
+          if (profile?.muscles) {
+            cacheExerciseProfile(trimmed, profile);
+            setAiResult({ name: trimmed, category: 'AI Generated' });
+          }
+        }
+      } catch {}
+      setAiLoading(false);
+    }, 500);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [trimmed, noLocalMatch]);
+
+  const grouped = localResults.reduce<Record<string, typeof localResults>>((acc, ex) => {
     (acc[ex.category] = acc[ex.category] ?? []).push(ex);
     return acc;
   }, {});
@@ -83,14 +118,30 @@ function ExercisePicker({
             </BrutlText>
           )}
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            {/* Custom / unknown exercise */}
-            {showCustom && (
+            {/* AI-generated result for unknown exercise */}
+            {aiLoading && noLocalMatch && (
+              <View style={[st.epExRow, { opacity: 0.6 }]}>
+                <BrutlText style={st.epExName}>Looking up "{trimmed}" via AI…</BrutlText>
+              </View>
+            )}
+            {aiResult && (
               <TouchableOpacity
-                style={[st.epExRow, { borderBottomColor: BrutlColors.accentDim }]}
+                style={st.epExRow}
+                onPress={() => { onSelect(aiResult.name); onClose(); }}
+              >
+                <BrutlText style={[st.epExName, { flex: 1 }]}>{aiResult.name}</BrutlText>
+                <View style={[st.epAiBadge, { backgroundColor: 'rgba(226,75,74,0.25)' }]}>
+                  <BrutlText style={st.epAiBadgeTxt}>AI ✦</BrutlText>
+                </View>
+              </TouchableOpacity>
+            )}
+            {/* Custom fallback if AI also found nothing */}
+            {noLocalMatch && !aiLoading && !aiResult && trimmed.length >= 2 && (
+              <TouchableOpacity
+                style={st.epExRow}
                 onPress={() => { onSelect(trimmed); onClose(); }}
               >
-                <BrutlText style={[st.epExName, { color: BrutlColors.accent }]}>+ Add "{trimmed}"</BrutlText>
-                <BrutlText style={[st.epAiBadgeTxt, { color: BrutlColors.textDisabled }]}>Custom</BrutlText>
+                <BrutlText style={[st.epExName, { color: BrutlColors.accent }]}>+ Add "{trimmed}" as custom</BrutlText>
               </TouchableOpacity>
             )}
             {Object.entries(grouped).map(([cat, items]) => (
@@ -129,21 +180,28 @@ function RoutinesSheet({
   onClose: () => void;
 }) {
   const splits = useRoutineStore((s) => s.splits);
+  const updateExercise = useRoutineStore((s) => s.updateExercise);
+  const removeExercise = useRoutineStore((s) => s.removeExercise);
+  const addExercise = useRoutineStore((s) => s.addExercise);
+
   const [expandedSplit, setExpandedSplit] = useState<string | null>(splits[0]?.id ?? null);
+  const [editingDay, setEditingDay] = useState<string | null>(null);
+  const [exPicker, setExPicker] = useState<{ splitId: string; dayId: string; existing: string[] } | null>(null);
 
   return (
     <Modal transparent animationType="slide" onRequestClose={onClose}>
       <View style={st.epBackdrop}>
-        <View style={[st.epSheet, { maxHeight: '80%' }]}>
+        <View style={[st.epSheet, { maxHeight: '85%' }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: BrutlSpacing.md }}>
-            <BrutlText style={[st.epHint, { flex: 1, fontSize: 14, color: BrutlColors.textPrimary, fontFamily: BrutlFonts.display, letterSpacing: 1 }]}>
+            <BrutlText style={{ flex: 1, fontFamily: BrutlFonts.display, fontSize: 16, color: BrutlColors.textPrimary, letterSpacing: 1 }}>
               ROUTINES
             </BrutlText>
             <TouchableOpacity onPress={onClose}>
               <BrutlText style={st.epCloseBtn}>✕</BrutlText>
             </TouchableOpacity>
           </View>
-          <ScrollView showsVerticalScrollIndicator={false}>
+
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             {splits.map((split) => (
               <View key={split.id} style={st.rSplit}>
                 <TouchableOpacity
@@ -158,29 +216,111 @@ function RoutinesSheet({
                     color={BrutlColors.textDisabled}
                   />
                 </TouchableOpacity>
+
                 {expandedSplit === split.id && split.days.map((day) => (
-                  <TouchableOpacity
-                    key={day.id}
-                    style={st.rDay}
-                    onPress={() => {
-                      onLoadDay(day.name, day.exercises.map((e) => ({ name: e.name, sets: e.targetSets, reps: e.targetReps, weight: e.targetWeightKg })));
-                      onClose();
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <BrutlText style={st.rDayName}>{day.name}</BrutlText>
-                      <BrutlText style={st.rDayEx}>{day.exercises.map((e) => e.name).join(' · ')}</BrutlText>
+                  <View key={day.id} style={st.rDayBlock}>
+                    {/* Day header row */}
+                    <View style={st.rDayHeaderRow}>
+                      <View style={{ flex: 1 }}>
+                        <BrutlText style={st.rDayName}>{day.name}</BrutlText>
+                        {editingDay !== day.id && (
+                          <BrutlText style={st.rDayEx} numberOfLines={1}>
+                            {day.exercises.map((e) => e.name).join(' · ')}
+                          </BrutlText>
+                        )}
+                      </View>
+                      <TouchableOpacity
+                        style={st.rEditBtn}
+                        onPress={() => setEditingDay(editingDay === day.id ? null : day.id)}
+                      >
+                        <Ionicons
+                          name={editingDay === day.id ? 'checkmark' : 'create-outline'}
+                          size={12}
+                          color={editingDay === day.id ? BrutlColors.success : BrutlColors.textDisabled}
+                        />
+                      </TouchableOpacity>
+                      {editingDay !== day.id && (
+                        <TouchableOpacity
+                          style={st.rStartBtn}
+                          onPress={() => {
+                            onLoadDay(day.name, day.exercises.map((e) => ({ name: e.name, sets: e.targetSets, reps: e.targetReps, weight: e.targetWeightKg })));
+                            onClose();
+                          }}
+                        >
+                          <BrutlText style={st.rStartTxt}>START</BrutlText>
+                        </TouchableOpacity>
+                      )}
                     </View>
-                    <View style={st.rStartBtn}>
-                      <BrutlText style={st.rStartTxt}>START</BrutlText>
-                    </View>
-                  </TouchableOpacity>
+
+                    {/* Edit mode: exercise list with inline editing */}
+                    {editingDay === day.id && (
+                      <View style={st.rEditBody}>
+                        {/* Column labels */}
+                        <View style={st.rEditColRow}>
+                          <BrutlText style={[st.rEditColLabel, { flex: 1 }]}>EXERCISE</BrutlText>
+                          <BrutlText style={[st.rEditColLabel, { width: 36 }]}>SETS</BrutlText>
+                          <BrutlText style={[st.rEditColLabel, { width: 60 }]}>REPS</BrutlText>
+                          <BrutlText style={[st.rEditColLabel, { width: 50 }]}>KG</BrutlText>
+                          <View style={{ width: 20 }} />
+                        </View>
+                        {day.exercises.map((ex) => (
+                          <View key={ex.name} style={st.rEditRow}>
+                            <BrutlText style={[st.rDayName, { flex: 1, fontSize: 11 }]} numberOfLines={1}>{ex.name}</BrutlText>
+                            <TextInput
+                              style={st.rEditInput}
+                              value={String(ex.targetSets)}
+                              onChangeText={(v) => updateExercise(split.id, day.id, ex.name, { targetSets: parseInt(v) || 1 })}
+                              keyboardType="number-pad"
+                              selectTextOnFocus
+                            />
+                            <TextInput
+                              style={[st.rEditInput, { width: 60 }]}
+                              value={ex.targetReps}
+                              onChangeText={(v) => updateExercise(split.id, day.id, ex.name, { targetReps: v })}
+                              selectTextOnFocus
+                            />
+                            <TextInput
+                              style={[st.rEditInput, { width: 50 }]}
+                              value={ex.targetWeightKg ? String(ex.targetWeightKg) : ''}
+                              onChangeText={(v) => updateExercise(split.id, day.id, ex.name, { targetWeightKg: parseFloat(v) || undefined })}
+                              keyboardType="decimal-pad"
+                              placeholder="—"
+                              placeholderTextColor={BrutlColors.textDisabled}
+                              selectTextOnFocus
+                            />
+                            <TouchableOpacity
+                              onPress={() => removeExercise(split.id, day.id, ex.name)}
+                              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            >
+                              <Ionicons name="close" size={13} color={BrutlColors.textDisabled} />
+                            </TouchableOpacity>
+                          </View>
+                        ))}
+                        <TouchableOpacity
+                          style={st.rAddExBtn}
+                          onPress={() => setExPicker({ splitId: split.id, dayId: day.id, existing: day.exercises.map((e) => e.name) })}
+                        >
+                          <Ionicons name="add" size={12} color={BrutlColors.accent} />
+                          <BrutlText style={{ fontSize: 11, color: BrutlColors.accent }}>Add exercise</BrutlText>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
                 ))}
               </View>
             ))}
           </ScrollView>
         </View>
       </View>
+
+      {/* Exercise picker for adding to routine */}
+      {exPicker && (
+        <ExercisePicker
+          currentNames={exPicker.existing}
+          onSelect={(name) => addExercise(exPicker.splitId, exPicker.dayId, { name, targetSets: 3, targetReps: '8-12' })}
+          onClose={() => setExPicker(null)}
+        />
+      )}
     </Modal>
   );
 }
@@ -1155,11 +1295,30 @@ const st = StyleSheet.create({
   rSplitHeader: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 6 },
   rSplitName: { flex: 1, fontFamily: BrutlFonts.display, fontSize: 15, color: BrutlColors.textPrimary, letterSpacing: 0.5 },
   rSplitMeta: { fontSize: 10, color: BrutlColors.textDisabled },
-  rDay: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingLeft: BrutlSpacing.md, gap: 8 },
-  rDayName: { fontSize: 12, color: BrutlColors.textPrimary, fontFamily: BrutlFonts.display, letterSpacing: 0.3, marginBottom: 2 },
+  rDayBlock: { borderTopWidth: 0.5, borderTopColor: BrutlColors.border },
+  rDayHeaderRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingLeft: BrutlSpacing.md, paddingRight: BrutlSpacing.sm, gap: 6 },
+  rDayName: { fontSize: 12, color: BrutlColors.textPrimary, fontFamily: BrutlFonts.display, letterSpacing: 0.3, marginBottom: 1 },
   rDayEx: { fontSize: 10, color: BrutlColors.textDisabled },
+  rEditBtn: { padding: 6, borderRadius: BrutlRadius.sm, borderWidth: 1, borderColor: BrutlColors.border },
   rStartBtn: { backgroundColor: BrutlColors.accent, borderRadius: BrutlRadius.sm, paddingHorizontal: 10, paddingVertical: 4 },
   rStartTxt: { color: '#fff', fontSize: 9, fontFamily: BrutlFonts.display, letterSpacing: 1 },
+  rEditBody: { paddingHorizontal: BrutlSpacing.md, paddingBottom: BrutlSpacing.sm },
+  rEditColRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  rEditColLabel: { fontSize: 8, color: BrutlColors.textDisabled, letterSpacing: 0.5, width: 36, textAlign: 'center' },
+  rEditRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
+  rEditInput: {
+    width: 36,
+    backgroundColor: BrutlColors.bgCardSubtle,
+    borderRadius: BrutlRadius.sm,
+    borderWidth: 1,
+    borderColor: BrutlColors.borderVisible,
+    color: BrutlColors.textPrimary,
+    fontSize: 11,
+    paddingVertical: 4,
+    textAlign: 'center',
+    fontFamily: BrutlFonts.mono,
+  },
+  rAddExBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 8 },
 
   // Exercise picker (ep namespace used inline)
   epBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },

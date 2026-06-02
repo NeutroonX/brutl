@@ -633,10 +633,17 @@ export const ALL_EXERCISES: { name: string; category: string }[] = [
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
+// Runtime cache for AI-generated profiles (unknown exercises)
+const SESSION_CACHE = new Map<string, ExerciseAIProfile>();
+
+export function cacheExerciseProfile(exercise: string, profile: ExerciseAIProfile) {
+  SESSION_CACHE.set(exercise.toLowerCase(), profile);
+}
+
 export function getExerciseProfile(exercise: string): ExerciseAIProfile | null {
-  const key = Object.keys(EXERCISE_DB).find(
-    (k) => k.toLowerCase() === exercise.toLowerCase()
-  );
+  const lower = exercise.toLowerCase();
+  if (SESSION_CACHE.has(lower)) return SESSION_CACHE.get(lower)!;
+  const key = Object.keys(EXERCISE_DB).find((k) => k.toLowerCase() === lower);
   return key ? EXERCISE_DB[key] : null;
 }
 
