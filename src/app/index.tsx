@@ -9,6 +9,8 @@ import { RANK_COLORS } from '@/components/ui/RankBadge';
 import { XPBar } from '@/components/ui/XPBar';
 import { XPToast } from '@/components/ui/XPToast';
 import { RankUpModal } from '@/components/RankUpModal';
+import { WeeklyXPChart } from '@/components/WeeklyXPChart';
+import { StreakTauntCard } from '@/components/StreakTauntCard';
 import { BrutlColors, BrutlSpacing } from '@/constants/theme';
 import { buildRoastPayload, streamRoast } from '@/lib/roast-engine';
 import { RANK_TITLES, getXPForNextRank, getXPInCurrentRank, getXPRangeForRank } from '@/lib/rank';
@@ -17,6 +19,7 @@ import { useQuestStore } from '@/stores/quest.store';
 import { useRoastStore } from '@/stores/roast.store';
 import { useUserStore } from '@/stores/user.store';
 import { useWatchStore } from '@/stores/watch.store';
+import { useWorkoutStore } from '@/stores/workout.store';
 import type { Rank } from '@/types';
 
 const NEXT_RANK: Record<Rank, Rank | null> = {
@@ -68,6 +71,7 @@ export default function HomeScreen() {
   const quests = useQuestStore((s) => s.quests);
   const activeQuests = quests.filter((q) => !q.completedAt && q.expiresAt > Date.now()).slice(0, 3);
   const { vitals, syncVitals, hasPermission, isAvailable } = useWatchStore();
+  const workoutLogs = useWorkoutStore((s) => s.logs);
   const dungeonRun = useDungeonStore((s) => s.run);
   const dungeonMultiplier = useDungeonStore((s) => s.getMultiplier)();
   const multiplierActive = dungeonMultiplier > 1;
@@ -274,17 +278,17 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Empty quest state */}
-        {activeQuests.length === 0 && !latestRoast && (
-          <BrutlCard subtle>
-            <View style={{ alignItems: 'center', gap: BrutlSpacing.sm, paddingVertical: BrutlSpacing.md }}>
-              <BrutlText variant="display" style={{ fontSize: 32, color: BrutlColors.accent }}>DAY 1.</BrutlText>
-              <BrutlText variant="muted" style={{ textAlign: 'center' }}>
-                Log a workout or meal to start earning XP and unlock quests.
-              </BrutlText>
-            </View>
-          </BrutlCard>
-        )}
+        {/* Weekly XP Chart */}
+        <BrutlCard subtle>
+          <WeeklyXPChart logs={workoutLogs} />
+        </BrutlCard>
+
+        {/* Streak Taunt — roast engine correction wired in */}
+        <StreakTauntCard
+          streakDays={profile.streakDays}
+          correction={latestCorrection}
+          isStreaming={isStreaming}
+        />
 
       </ScrollView>
     </View>
