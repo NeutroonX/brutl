@@ -23,7 +23,7 @@ function getTaunt(streak: number): TauntConfig {
     nextMilestone: { days: 7, xp: 250 },
   };
   if (streak === 1) return {
-    headline: 'DAY ONE.',
+    headline: 'DAY ONE',
     sub: 'You showed up. That\'s the lowest bar. Clear it again tomorrow.',
     nextMilestone: { days: 7, xp: 250 },
   };
@@ -157,16 +157,16 @@ export function StreakTauntCard({ streakDays, correction, isStreaming }: Props) 
 
   return (
     <View style={styles.card}>
-      <View style={styles.accentBar} />
       <View style={styles.content}>
 
         {/* Headline */}
         <View style={styles.topRow}>
           <BrutlText style={styles.headline}>{taunt.headline}</BrutlText>
           {streakDays > 0 && (
-            <View style={{ alignItems: 'flex-end' }}>
-              <BrutlText style={{ fontFamily: 'BebasNeue_400Regular', fontSize: 24, color: BrutlColors.accent }}>
-                🔥{streakDays}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <BrutlText style={{ fontSize: 18 }}>🔥</BrutlText>
+              <BrutlText style={{ fontFamily: 'BebasNeue_400Regular', fontSize: 24, color: BrutlColors.accent, lineHeight: 26 }}>
+                {streakDays}
               </BrutlText>
             </View>
           )}

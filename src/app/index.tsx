@@ -128,7 +128,7 @@ export default function HomeScreen() {
         {/* Greeting header */}
         <View style={styles.header}>
           <View>
-            <BrutlText style={styles.greetingText}>{greeting()}, {profile.name.split(' ')[0]}.</BrutlText>
+            <BrutlText style={styles.greetingText}>{greeting()}, {profile.name.split(' ')[0]}</BrutlText>
             <BrutlText style={styles.dateText}>{todayLabel()} · Day {profile.streakDays > 0 ? profile.streakDays : 1}</BrutlText>
           </View>
           <TouchableOpacity onPress={() => router.push('/settings' as any)} hitSlop={12}>
