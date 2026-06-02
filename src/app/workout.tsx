@@ -13,6 +13,8 @@ import {
 import { BrutlButton } from '@/components/ui/BrutlButton';
 import { BrutlCard } from '@/components/ui/BrutlCard';
 import { BrutlText } from '@/components/ui/BrutlText';
+import { XPToast, useXPToast } from '@/components/ui/XPToast';
+import { useDungeonStore } from '@/stores/dungeon.store';
 import { BrutlColors, BrutlFonts, BrutlRadius, BrutlSpacing } from '@/constants/theme';
 import { buildRoastPayload, streamRoast } from '@/lib/roast-engine';
 import { calcWorkoutXP } from '@/lib/xp';
@@ -76,6 +78,8 @@ export default function WorkoutScreen() {
   const updateXP = useUserStore((s) => s.updateXP);
   const addLog = useWorkoutStore((s) => s.addLog);
   const getBaseline = useWorkoutStore((s) => s.getBaselineForExercise);
+  const multiplier = useDungeonStore((s) => s.getMultiplier)();
+  const { pending: xpPending, showXP, clearXP } = useXPToast();
 
   const [exercise, setExercise] = useState('');
   const [exercises, setExercises] = useState<{ name: string; sets: SetEntry[] }[]>([]);
@@ -123,9 +127,11 @@ export default function WorkoutScreen() {
       }))
     );
 
-    const xp = calcWorkoutXP(parsed, parseInt(duration) || 45);
+    const baseXP = calcWorkoutXP(parsed, parseInt(duration) || 45);
+    const xp = Math.round(baseXP * multiplier);
     await addLog(parsed, parseInt(duration) || 45, xp);
     await updateXP(xp);
+    showXP(xp);
 
     // Check if any exercise is below baseline — fire roast if so
     for (const ex of exercises) {
@@ -147,11 +153,11 @@ export default function WorkoutScreen() {
 
     setSaving(false);
     setExercises([]);
-    Alert.alert('Done!', `+${xp} XP earned. Keep going.`);
   }
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <XPToast amount={xpPending} onHide={clearXP} multiplier={multiplier} />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <BrutlText variant="heading">Log Workout</BrutlText>
 

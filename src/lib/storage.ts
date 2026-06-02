@@ -27,4 +27,6 @@ export const STORAGE_KEYS = {
   hasOnboarded: 'brutl:has_onboarded',
   watchVitals: 'brutl:watch_vitals',
   lastOpenDate: 'brutl:last_open_date',
+  dungeon: 'brutl:dungeon',
+  shadows: 'brutl:shadows',
 } as const;

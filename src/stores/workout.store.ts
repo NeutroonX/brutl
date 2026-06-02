@@ -2,10 +2,12 @@ import { create } from 'zustand';
 
 import { STORAGE_KEYS, storageGet, storageSet } from '@/lib/storage';
 import { useQuestStore } from '@/stores/quest.store';
+import { useDungeonStore } from '@/stores/dungeon.store';
 import type { ExerciseSet, WorkoutLog } from '@/types';
 
 interface WorkoutState {
   logs: WorkoutLog[];
+  prCount: number; // lifetime exercises beaten above baseline
   addLog: (exercises: ExerciseSet[], durationMinutes: number, xpEarned: number) => Promise<WorkoutLog>;
   getRecentLogs: (days: number) => WorkoutLog[];
   getBaselineForExercise: (exercise: string) => number;
@@ -14,6 +16,7 @@ interface WorkoutState {
 
 export const useWorkoutStore = create<WorkoutState>((set, get) => ({
   logs: [],
+  prCount: 0,
 
   addLog: async (exercises, durationMinutes, xpEarned) => {
     const entry: WorkoutLog = {
@@ -27,21 +30,41 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     set({ logs: updated });
     await storageSet(STORAGE_KEYS.workoutLog, updated);
 
-    // Progress daily quest by 50% for logging a workout
+    // Quest progress — 50% for logging a workout
     const questStore = useQuestStore.getState();
     await questStore.progressActiveQuest('DAILY', 0.5).catch(() => {});
 
-    // Complete boss quest if any exercise beats its baseline
-    const bossQuest = questStore.getActiveByType('BOSS');
-    if (bossQuest) {
-      for (const ex of exercises) {
-        const baseline = get().getBaselineForExercise(ex.exercise);
-        if (baseline > 0 && ex.weightKg > baseline) {
-          await questStore.progressActiveQuest('BOSS', 1).catch(() => {});
-          break;
-        }
+    // Boss quest — check if any exercise beats baseline
+    let newPRs = 0;
+    for (const ex of exercises) {
+      const baseline = get().getBaselineForExercise(ex.exercise);
+      if (baseline > 0 && ex.weightKg > baseline) {
+        newPRs++;
+        await questStore.progressActiveQuest('BOSS', 1).catch(() => {});
+        break;
       }
     }
+
+    // Update PR count
+    const newPRCount = get().prCount + newPRs;
+    if (newPRs > 0) set({ prCount: newPRCount });
+
+    // Dungeon progress
+    await useDungeonStore.getState().onWorkoutLogged(durationMinutes).catch(() => {});
+
+    // Shadow quest triggers
+    const hour = new Date().getHours();
+    const logsToday = get().getRecentLogs(1).filter(
+      (l) => new Date(l.date).toDateString() === new Date().toDateString()
+    ).length;
+    const workoutsThisWeek = get().getRecentLogs(7).length;
+
+    await questStore.checkShadowTriggers({
+      workoutHour: hour,
+      workoutsThisWeek,
+      prCount: newPRCount,
+      workoutsToday: logsToday,
+    }).catch(() => {});
 
     return entry;
   },

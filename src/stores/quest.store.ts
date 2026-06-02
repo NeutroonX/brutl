@@ -1,16 +1,21 @@
 import { create } from 'zustand';
 
 import { STORAGE_KEYS, storageGet, storageSet } from '@/lib/storage';
-import type { Quest, QuestType } from '@/types';
+import { buildUnlockedShadow, checkShadowTriggers, type ShadowCheckContext } from '@/lib/shadow-quests';
+import type { Quest, QuestType, UnlockedShadow } from '@/types';
 
 interface QuestState {
   quests: Quest[];
+  shadows: UnlockedShadow[];
   seedInitialQuests: () => Promise<void>;
   refreshDailyQuests: () => Promise<void>;
   updateProgress: (id: string, progress: number) => Promise<void>;
   progressActiveQuest: (type: QuestType, amount: number) => Promise<void>;
   completeQuest: (id: string) => Promise<Quest | null>;
   getActiveByType: (type: QuestType) => Quest | null;
+  checkShadowTriggers: (ctx: ShadowCheckContext) => Promise<UnlockedShadow[]>;
+  revealShadow: (id: string) => Promise<void>;
+  claimShadow: (id: string) => Promise<number>;
   loadFromStorage: () => Promise<void>;
 }
 
@@ -94,6 +99,7 @@ function pickRandom<T>(pool: T[]): T {
 
 export const useQuestStore = create<QuestState>((set, get) => ({
   quests: [],
+  shadows: [],
 
   seedInitialQuests: async () => {
     const existing = get().quests;
@@ -185,8 +191,36 @@ export const useQuestStore = create<QuestState>((set, get) => ({
   getActiveByType: (type) =>
     get().quests.find((q) => q.type === type && !q.completedAt && q.expiresAt > Date.now()) ?? null,
 
+  checkShadowTriggers: async (ctx) => {
+    const alreadyUnlocked = get().shadows.map((s) => s.triggerId);
+    const fired = checkShadowTriggers(ctx, alreadyUnlocked);
+    if (fired.length === 0) return [];
+    const newShadows = fired.map(buildUnlockedShadow);
+    const updated = [...get().shadows, ...newShadows];
+    set({ shadows: updated });
+    await storageSet(STORAGE_KEYS.shadows, updated);
+    return newShadows;
+  },
+
+  revealShadow: async (id) => {
+    const updated = get().shadows.map((s) => s.id === id ? { ...s, revealed: true } : s);
+    set({ shadows: updated });
+    await storageSet(STORAGE_KEYS.shadows, updated);
+  },
+
+  claimShadow: async (id) => {
+    const shadow = get().shadows.find((s) => s.id === id);
+    if (!shadow || shadow.claimed) return 0;
+    const updated = get().shadows.map((s) => s.id === id ? { ...s, claimed: true } : s);
+    set({ shadows: updated });
+    await storageSet(STORAGE_KEYS.shadows, updated);
+    return shadow.xpReward;
+  },
+
   loadFromStorage: async () => {
     const quests = await storageGet<Quest[]>(STORAGE_KEYS.quests);
+    const shadows = await storageGet<UnlockedShadow[]>(STORAGE_KEYS.shadows);
     if (quests) set({ quests });
+    if (shadows) set({ shadows });
   },
 }));

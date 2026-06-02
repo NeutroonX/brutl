@@ -81,6 +81,29 @@ export interface Quest {
   progress: number;
 }
 
+export interface DungeonRun {
+  id: string;
+  startedAt: number;
+  currentDay: number;       // 1–7
+  dayStartedAt: number;     // timestamp when current day became active
+  daysCompleted: number[];  // completion timestamps, index 0–6
+  todayWorkoutDuration: number;
+  todayProteinRatio: number;
+  status: 'ACTIVE' | 'COMPLETED' | 'FAILED';
+  xpMultiplierUntil: number | null;
+}
+
+export interface UnlockedShadow {
+  id: string;
+  triggerId: string;
+  title: string;
+  description: string;
+  xpReward: number;
+  unlockedAt: number;
+  claimed: boolean;
+  revealed: boolean;
+}
+
 export interface WatchData {
   date: number;
   restingHR: number;
