@@ -10,7 +10,7 @@ import { BrutlButton } from '@/components/ui/BrutlButton';
 import { BrutlText } from '@/components/ui/BrutlText';
 import { Ionicons } from '@expo/vector-icons';
 import { BrutlColors, BrutlFonts, BrutlRadius, BrutlSpacing } from '@/constants/theme';
-import { useUserStore } from '@/stores/user.store';
+import { useUserStore, buildUserProfile } from '@/stores/user.store';
 import { useWatchStore } from '@/stores/watch.store';
 import { storageRemove, STORAGE_KEYS } from '@/lib/storage';
 import type { Goal, WeakArea } from '@/types';
@@ -133,13 +133,20 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
   async function handleSave() {
     if (!profile || !name.trim()) return;
     setSaving(true);
+    const newWeightKg = parseFloat(weightKg) || profile.weightKg;
+    const newHeightCm = parseInt(heightCm) || profile.heightCm;
+    // Recalculate macro targets if weight or goal changed
+    const macroTargets = (newWeightKg !== profile.weightKg || goal !== profile.goal)
+      ? buildUserProfile({ name: name.trim(), age: profile.age, weightKg: newWeightKg, heightCm: newHeightCm, goal, weakArea }).macroTargets
+      : profile.macroTargets;
     await setProfile({
       ...profile,
       name: name.trim(),
-      weightKg: parseFloat(weightKg) || profile.weightKg,
-      heightCm: parseInt(heightCm) || profile.heightCm,
+      weightKg: newWeightKg,
+      heightCm: newHeightCm,
       goal,
       weakArea,
+      macroTargets,
     });
     setSaving(false);
     onClose();

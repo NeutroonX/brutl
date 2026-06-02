@@ -15,6 +15,7 @@ import { BrutlCard } from '@/components/ui/BrutlCard';
 import { BrutlText } from '@/components/ui/BrutlText';
 import { BarcodeScanModal, type ScannedFood } from '@/components/BarcodeScanModal';
 import { PhotoScanModal } from '@/components/PhotoScanModal';
+import { ScanConfirmSheet } from '@/components/ScanConfirmSheet';
 import { BrutlColors, BrutlFonts, BrutlRadius, BrutlSpacing } from '@/constants/theme';
 import { buildRoastPayload, streamRoast } from '@/lib/roast-engine';
 import { calcMacroCompliance } from '@/lib/xp';
@@ -93,6 +94,7 @@ export default function DietScreen() {
   const [searching, setSearching] = useState(false);
   const [showBarcode, setShowBarcode] = useState(false);
   const [showPhoto, setShowPhoto] = useState(false);
+  const [pendingScan, setPendingScan] = useState<ScannedFood | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -106,9 +108,14 @@ export default function DietScreen() {
     }, 500);
   }, [query]);
 
-  async function handleScannedFood(food: ScannedFood) {
+  function handleScannedFood(food: ScannedFood) {
     setShowBarcode(false);
     setShowPhoto(false);
+    setPendingScan(food);
+  }
+
+  async function handleConfirmScan(food: ScannedFood) {
+    setPendingScan(null);
     await handleAdd(food);
   }
 
@@ -134,6 +141,7 @@ export default function DietScreen() {
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <BarcodeScanModal visible={showBarcode} onResult={handleScannedFood} onClose={() => setShowBarcode(false)} />
       <PhotoScanModal visible={showPhoto} onResult={handleScannedFood} onClose={() => setShowPhoto(false)} />
+      <ScanConfirmSheet food={pendingScan} onConfirm={handleConfirmScan} onCancel={() => setPendingScan(null)} />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
