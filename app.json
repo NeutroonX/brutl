@@ -24,7 +24,8 @@
         "android.permission.health.READ_HEART_RATE",
         "android.permission.health.READ_SLEEP",
         "android.permission.health.READ_STEPS",
-        "android.permission.health.READ_HEART_RATE_VARIABILITY"
+        "android.permission.health.READ_HEART_RATE_VARIABILITY",
+        "android.permission.CAMERA"
       ]
     },
     "web": {
@@ -34,6 +35,12 @@
     "plugins": [
       "expo-router",
       "expo-dev-client",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow BRUTL to access your camera to scan food barcodes and photograph meals."
+        }
+      ],
       [
         "expo-splash-screen",
         {

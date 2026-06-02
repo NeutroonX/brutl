@@ -12,7 +12,7 @@ interface UserState {
   setProfile: (profile: UserProfile) => Promise<void>;
   updateXP: (delta: number) => Promise<void>;
   updateStreak: (days: number) => Promise<void>;
-  checkAndUpdateStreak: () => Promise<void>;
+  checkAndUpdateStreak: () => Promise<number>;
   setRank: (rank: Rank) => Promise<void>;
   clearPendingRankUp: () => void;
   loadFromStorage: () => Promise<void>;
@@ -95,19 +95,18 @@ export const useUserStore = create<UserState>((set, get) => ({
     await storageSet(STORAGE_KEYS.user, updated);
   },
 
-  checkAndUpdateStreak: async () => {
+  checkAndUpdateStreak: async (): Promise<number> => {
     const { profile } = get();
-    if (!profile) return;
+    if (!profile) return 0;
     const today = todayDateKey();
     const yesterday = yesterdayDateKey();
     const lastOpen = await storageGet<string>(STORAGE_KEYS.lastOpenDate);
 
     await storageSet(STORAGE_KEYS.lastOpenDate, today);
 
-    if (lastOpen === today) return; // already opened today
+    if (lastOpen === today) return 0; // already opened today
 
     if (lastOpen === yesterday) {
-      // consecutive day — increment streak
       const newStreak = profile.streakDays + 1;
       const bonus = calcStreakBonus(newStreak);
       const newXP = Math.max(0, profile.xp + bonus);
@@ -119,17 +118,17 @@ export const useUserStore = create<UserState>((set, get) => ({
         pendingRankUp: rankChanged ? newRank : get().pendingRankUp,
       });
       await storageSet(STORAGE_KEYS.user, updated);
+      return bonus; // return so caller can show XP toast
     } else if (lastOpen !== null && lastOpen !== today) {
-      // missed a day — reset streak to 1
       const updated = { ...profile, streakDays: 1 };
       set({ profile: updated });
       await storageSet(STORAGE_KEYS.user, updated);
     } else {
-      // first ever open — set streak to 1
       const updated = { ...profile, streakDays: 1 };
       set({ profile: updated });
       await storageSet(STORAGE_KEYS.user, updated);
     }
+    return 0;
   },
 
   setRank: async (rank) => {

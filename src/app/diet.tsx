@@ -10,8 +10,11 @@ import {
   View,
 } from 'react-native';
 
+import { Ionicons } from '@expo/vector-icons';
 import { BrutlCard } from '@/components/ui/BrutlCard';
 import { BrutlText } from '@/components/ui/BrutlText';
+import { BarcodeScanModal, type ScannedFood } from '@/components/BarcodeScanModal';
+import { PhotoScanModal } from '@/components/PhotoScanModal';
 import { BrutlColors, BrutlFonts, BrutlRadius, BrutlSpacing } from '@/constants/theme';
 import { buildRoastPayload, streamRoast } from '@/lib/roast-engine';
 import { calcMacroCompliance } from '@/lib/xp';
@@ -67,6 +70,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: BrutlSpacing.md,
     paddingVertical: BrutlSpacing.sm,
   },
+  scanBtn: {
+    width: 38, height: 38, borderRadius: BrutlRadius.sm,
+    backgroundColor: BrutlColors.bgCard, borderWidth: 1,
+    borderColor: BrutlColors.borderVisible, alignItems: 'center', justifyContent: 'center',
+  },
   resultItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: BrutlSpacing.sm },
   macroRow: { flexDirection: 'row', gap: BrutlSpacing.md },
   macroBox: { alignItems: 'center', flex: 1 },
@@ -83,6 +91,8 @@ export default function DietScreen() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<FoodResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [showBarcode, setShowBarcode] = useState(false);
+  const [showPhoto, setShowPhoto] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -95,6 +105,12 @@ export default function DietScreen() {
       setSearching(false);
     }, 500);
   }, [query]);
+
+  async function handleScannedFood(food: ScannedFood) {
+    setShowBarcode(false);
+    setShowPhoto(false);
+    await handleAdd(food);
+  }
 
   async function handleAdd(food: FoodResult) {
     if (!profile) return;
@@ -116,8 +132,29 @@ export default function DietScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <BarcodeScanModal visible={showBarcode} onResult={handleScannedFood} onClose={() => setShowBarcode(false)} />
+      <PhotoScanModal visible={showPhoto} onResult={handleScannedFood} onClose={() => setShowPhoto(false)} />
+
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <BrutlText variant="heading">Diet Log</BrutlText>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <BrutlText variant="heading">Diet Log</BrutlText>
+          <View style={{ flexDirection: 'row', gap: BrutlSpacing.sm }}>
+            <TouchableOpacity
+              style={styles.scanBtn}
+              onPress={() => setShowBarcode(true)}
+              hitSlop={8}
+            >
+              <Ionicons name="barcode-outline" size={20} color={BrutlColors.textPrimary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.scanBtn}
+              onPress={() => setShowPhoto(true)}
+              hitSlop={8}
+            >
+              <Ionicons name="camera-outline" size={20} color={BrutlColors.textPrimary} />
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {/* Daily Macros Summary */}
         {targets && (
