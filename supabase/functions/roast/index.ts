@@ -1,5 +1,3 @@
-import Anthropic from 'npm:@anthropic-ai/sdk@0.39.0';
-
 const SYSTEM_PROMPT = `You are BRUTL — a brutally honest AI fitness accountability system.
 Your personality is a blend of:
 - Terence Fletcher: psychological precision, no sympathy for excuses
@@ -24,7 +22,6 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  const anthropic = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY')! });
   const payload = await req.json();
 
   const userMessage = `Data: ${JSON.stringify({
@@ -41,27 +38,62 @@ Deno.serve(async (req) => {
 
 Deliver the roast. End with a line starting with "CORRECTION:" for the actionable fix.`;
 
-  const stream = anthropic.messages.stream({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 256,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: userMessage }],
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${Deno.env.get('OPENROUTER_API_KEY')}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://brutl.app',
+      'X-Title': 'BRUTL',
+    },
+    body: JSON.stringify({
+      model: 'nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-FP8',
+      max_tokens: 256,
+      stream: true,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: userMessage },
+      ],
+    }),
   });
 
   const encoder = new TextEncoder();
   const readable = new ReadableStream({
     async start(controller) {
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
       let buffer = '';
-      for await (const event of stream) {
-        if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-          buffer += event.delta.text;
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: 'content_block_delta', delta: { text: event.delta.text } })}\n\n`)
-          );
+      let fullText = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') continue;
+
+          try {
+            const chunk = JSON.parse(data);
+            const text = chunk.choices?.[0]?.delta?.content ?? '';
+            if (!text) continue;
+
+            fullText += text;
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ type: 'content_block_delta', delta: { text } })}\n\n`)
+            );
+          } catch {
+            // skip malformed chunk
+          }
         }
       }
-      // Extract correction from buffer
-      const correctionMatch = buffer.match(/CORRECTION:\s*(.+)/i);
+
+      const correctionMatch = fullText.match(/CORRECTION:\s*(.+)/i);
       if (correctionMatch) {
         controller.enqueue(
           encoder.encode(`data: ${JSON.stringify({ type: 'correction', text: correctionMatch[1].trim() })}\n\n`)
