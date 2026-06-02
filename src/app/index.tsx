@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 
 import { BrutlCard } from '@/components/ui/BrutlCard';
 import { BrutlText } from '@/components/ui/BrutlText';
-import { RankBadge } from '@/components/ui/RankBadge';
+import { RANK_COLORS } from '@/components/ui/RankBadge';
 import { XPBar } from '@/components/ui/XPBar';
 import { XPToast } from '@/components/ui/XPToast';
 import { RankUpModal } from '@/components/RankUpModal';
@@ -143,27 +143,76 @@ export default function HomeScreen() {
         )}
 
         {/* Hero Rank Card */}
-        <BrutlCard>
-          <View style={styles.rankCard}>
-            <RankBadge rank={profile.rank} size="hero" />
-            <View style={styles.rankInfo}>
-              <BrutlText variant="display" style={styles.rankTitle}>
-                {profile.rank}
-              </BrutlText>
-              <BrutlText style={styles.rankSubtitle}>{RANK_TITLES[profile.rank]}</BrutlText>
-              {profile.streakDays > 0 && (
-                <BrutlText style={styles.streakText}>🔥 {profile.streakDays} day streak</BrutlText>
-              )}
-              <View style={{ marginTop: BrutlSpacing.xs }}>
+        {(() => {
+          const rankColor = RANK_COLORS[profile.rank];
+          return (
+            <View style={[styles.rankCard, {
+              backgroundColor: BrutlColors.bgCard,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: BrutlColors.borderVisible,
+              overflow: 'hidden',
+            }]}>
+              {/* Rank color left accent strip */}
+              <View style={{
+                position: 'absolute', left: 0, top: 0, bottom: 0,
+                width: 3, backgroundColor: rankColor,
+              }} />
+
+              {/* Huge background rank letter */}
+              <View style={{
+                position: 'absolute', right: -12, top: -28,
+                overflow: 'hidden',
+              }} pointerEvents="none">
+                <BrutlText style={{
+                  fontFamily: 'BebasNeue_400Regular',
+                  fontSize: 200, lineHeight: 200,
+                  color: rankColor, opacity: 0.07,
+                  letterSpacing: -4,
+                }}>
+                  {profile.rank}
+                </BrutlText>
+              </View>
+
+              {/* Content */}
+              <View style={{ padding: BrutlSpacing.lg, paddingLeft: BrutlSpacing.lg + 6, gap: BrutlSpacing.sm }}>
+                {/* Top row */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <BrutlText style={{ fontSize: 11, color: rankColor, letterSpacing: 2.5 }}>
+                    RANK {profile.rank}
+                  </BrutlText>
+                  {profile.streakDays > 0 && (
+                    <BrutlText style={{ fontSize: 12, color: BrutlColors.accent }}>
+                      🔥 {profile.streakDays} day streak
+                    </BrutlText>
+                  )}
+                </View>
+
+                {/* Rank title */}
+                <BrutlText style={{
+                  fontFamily: 'BebasNeue_400Regular',
+                  fontSize: 38, lineHeight: 40,
+                  color: BrutlColors.textPrimary,
+                  letterSpacing: 1,
+                }}>
+                  {RANK_TITLES[profile.rank]}
+                </BrutlText>
+
+                {/* XP bar */}
                 <XPBar
                   current={xpInRank}
                   max={xpRange}
                   nextRankName={nextRankName ?? undefined}
                 />
+
+                {/* XP total */}
+                <BrutlText style={{ fontSize: 11, color: BrutlColors.textDisabled }}>
+                  {profile.xp.toLocaleString()} total XP
+                </BrutlText>
               </View>
             </View>
-          </View>
-        </BrutlCard>
+          );
+        })()}
 
         {/* Vitals */}
         <BrutlCard subtle>
@@ -265,11 +314,7 @@ const styles = StyleSheet.create({
   },
   multiplierText: { fontSize: 12, color: '#4AE2C4', flex: 1, letterSpacing: 0.5 },
 
-  rankCard: { flexDirection: 'row', alignItems: 'center', gap: BrutlSpacing.lg },
-  rankInfo: { flex: 1, gap: 2 },
-  rankTitle: { fontSize: 48, lineHeight: 50, color: BrutlColors.textPrimary },
-  rankSubtitle: { fontSize: 13, color: BrutlColors.textMuted, letterSpacing: 0.5 },
-  streakText: { fontSize: 12, color: BrutlColors.accent, marginTop: 2 },
+  rankCard: { position: 'relative' },
 
   sectionLabel: { fontSize: 11, color: BrutlColors.accent, letterSpacing: 1.5, marginBottom: BrutlSpacing.sm },
   vitalsSectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: BrutlSpacing.sm },
