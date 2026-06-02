@@ -4,18 +4,19 @@
     "slug": "brutl",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/logo.png",
     "scheme": "brutl",
     "userInterfaceStyle": "dark",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/logo.png",
+      "supportsTablet": false
     },
     "android": {
+      "icon": "./assets/images/logo.png",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/images/logo.png",
         "backgroundColor": "#000000",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "monochromeImage": "./assets/images/logo.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.brutl.app",
@@ -28,7 +29,7 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/logo.png"
     },
     "plugins": [
       "expo-router",
@@ -37,9 +38,13 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#000000",
+          "image": "./assets/images/logo.png",
+          "imageWidth": 160,
+          "resizeMode": "contain",
           "android": {
-            "image": "./assets/images/splash-icon.png",
-            "imageWidth": 76
+            "image": "./assets/images/logo.png",
+            "imageWidth": 160,
+            "resizeMode": "contain"
           }
         }
       ],
