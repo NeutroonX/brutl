@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   Dimensions,
   KeyboardAvoidingView,
@@ -183,16 +184,29 @@ function RoutinesSheet({
   const updateExercise = useRoutineStore((s) => s.updateExercise);
   const removeExercise = useRoutineStore((s) => s.removeExercise);
   const addExercise = useRoutineStore((s) => s.addExercise);
+  const addSplitFn = useRoutineStore((s) => s.addSplit);
+  const deleteSplitFn = useRoutineStore((s) => s.deleteSplit);
+  const addDayFn = useRoutineStore((s) => s.addDay);
 
   const [expandedSplit, setExpandedSplit] = useState<string | null>(splits[0]?.id ?? null);
   const [editingDay, setEditingDay] = useState<string | null>(null);
   const [exPicker, setExPicker] = useState<{ splitId: string; dayId: string; existing: string[] } | null>(null);
+  const [newSplitName, setNewSplitName] = useState('');
+  const [addingNewDay, setAddingNewDay] = useState<string | null>(null); // splitId
+  const [newDayName, setNewDayName] = useState('');
+
+  function confirmDelete(splitId: string, name: string) {
+    Alert.alert('Delete Split', `Delete "${name}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteSplitFn(splitId) },
+    ]);
+  }
 
   return (
     <Modal transparent animationType="slide" onRequestClose={onClose}>
       <View style={st.epBackdrop}>
-        <View style={[st.epSheet, { maxHeight: '85%' }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: BrutlSpacing.md }}>
+        <View style={[st.epSheet, { maxHeight: '88%' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: BrutlSpacing.sm }}>
             <BrutlText style={{ flex: 1, fontFamily: BrutlFonts.display, fontSize: 16, color: BrutlColors.textPrimary, letterSpacing: 1 }}>
               ROUTINES
             </BrutlText>
@@ -201,21 +215,55 @@ function RoutinesSheet({
             </TouchableOpacity>
           </View>
 
+          {/* New split input */}
+          <View style={st.rNewSplitRow}>
+            <TextInput
+              style={[st.rEditInput, { flex: 1, textAlign: 'left', paddingHorizontal: 8, width: 'auto' }]}
+              value={newSplitName}
+              onChangeText={setNewSplitName}
+              placeholder="New split name (e.g. Bro Split)"
+              placeholderTextColor={BrutlColors.textDisabled}
+              onSubmitEditing={() => {
+                if (!newSplitName.trim()) return;
+                addSplitFn(newSplitName.trim()).then((s) => setExpandedSplit(s.id));
+                setNewSplitName('');
+              }}
+            />
+            <TouchableOpacity
+              style={st.rCreateBtn}
+              onPress={() => {
+                if (!newSplitName.trim()) return;
+                addSplitFn(newSplitName.trim()).then((s) => setExpandedSplit(s.id));
+                setNewSplitName('');
+              }}
+            >
+              <BrutlText style={st.rCreateBtnTxt}>CREATE</BrutlText>
+            </TouchableOpacity>
+          </View>
+
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             {splits.map((split) => (
               <View key={split.id} style={st.rSplit}>
-                <TouchableOpacity
-                  style={st.rSplitHeader}
-                  onPress={() => setExpandedSplit(expandedSplit === split.id ? null : split.id)}
-                >
-                  <BrutlText style={st.rSplitName}>{split.name}</BrutlText>
-                  <BrutlText style={st.rSplitMeta}>{split.days.length} days</BrutlText>
-                  <Ionicons
-                    name={expandedSplit === split.id ? 'chevron-up' : 'chevron-down'}
-                    size={13}
-                    color={BrutlColors.textDisabled}
-                  />
-                </TouchableOpacity>
+                <View style={st.rSplitHeader}>
+                  <TouchableOpacity
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                    onPress={() => setExpandedSplit(expandedSplit === split.id ? null : split.id)}
+                  >
+                    <BrutlText style={st.rSplitName}>{split.name}</BrutlText>
+                    <BrutlText style={st.rSplitMeta}>{split.days.length} days</BrutlText>
+                    <Ionicons
+                      name={expandedSplit === split.id ? 'chevron-up' : 'chevron-down'}
+                      size={13}
+                      color={BrutlColors.textDisabled}
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => confirmDelete(split.id, split.name)}
+                    hitSlop={{ top: 8, bottom: 8, left: 12, right: 0 }}
+                  >
+                    <Ionicons name="trash-outline" size={14} color={BrutlColors.textDisabled} />
+                  </TouchableOpacity>
+                </View>
 
                 {expandedSplit === split.id && split.days.map((day) => (
                   <View key={day.id} style={st.rDayBlock}>
@@ -307,6 +355,42 @@ function RoutinesSheet({
                     )}
                   </View>
                 ))}
+
+                {/* Add day row (shown when split is expanded) */}
+                {expandedSplit === split.id && (
+                  addingNewDay === split.id ? (
+                    <View style={st.rNewDayRow}>
+                      <TextInput
+                        style={[st.rEditInput, { flex: 1, textAlign: 'left', paddingHorizontal: 8, width: 'auto' }]}
+                        value={newDayName}
+                        onChangeText={setNewDayName}
+                        placeholder="Day name (e.g. Chest Day)"
+                        placeholderTextColor={BrutlColors.textDisabled}
+                        autoFocus
+                        onSubmitEditing={() => {
+                          if (!newDayName.trim()) return;
+                          addDayFn(split.id, newDayName.trim());
+                          setNewDayName(''); setAddingNewDay(null);
+                        }}
+                      />
+                      <TouchableOpacity style={st.rCreateBtn} onPress={() => {
+                        if (!newDayName.trim()) return;
+                        addDayFn(split.id, newDayName.trim());
+                        setNewDayName(''); setAddingNewDay(null);
+                      }}>
+                        <BrutlText style={st.rCreateBtnTxt}>ADD</BrutlText>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => { setAddingNewDay(null); setNewDayName(''); }}>
+                        <Ionicons name="close" size={14} color={BrutlColors.textDisabled} />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity style={st.rAddDayBtn} onPress={() => setAddingNewDay(split.id)}>
+                      <Ionicons name="add" size={12} color={BrutlColors.textDisabled} />
+                      <BrutlText style={{ fontSize: 11, color: BrutlColors.textDisabled }}>Add day</BrutlText>
+                    </TouchableOpacity>
+                  )
+                )}
               </View>
             ))}
           </ScrollView>
@@ -1319,6 +1403,11 @@ const st = StyleSheet.create({
     fontFamily: BrutlFonts.mono,
   },
   rAddExBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 8 },
+  rNewSplitRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: BrutlSpacing.sm },
+  rCreateBtn: { backgroundColor: BrutlColors.accent, borderRadius: BrutlRadius.sm, paddingHorizontal: 10, paddingVertical: 6 },
+  rCreateBtnTxt: { color: '#fff', fontSize: 10, fontFamily: BrutlFonts.display, letterSpacing: 1 },
+  rAddDayBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: BrutlSpacing.md, paddingVertical: 8 },
+  rNewDayRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: BrutlSpacing.md, paddingVertical: 6, borderTopWidth: 0.5, borderTopColor: BrutlColors.border },
 
   // Exercise picker (ep namespace used inline)
   epBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
