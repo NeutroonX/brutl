@@ -19,6 +19,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.brutl.app",
+      "minSdkVersion": 26,
       "permissions": [
         "android.permission.health.READ_HEART_RATE",
         "android.permission.health.READ_SLEEP",
