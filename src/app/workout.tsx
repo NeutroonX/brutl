@@ -26,19 +26,88 @@ import {
   getInlineRoastText,
   getTopMuscles,
   getWeekNumber,
+  searchExercises,
+  getSuggestedExercises,
 } from '@/lib/workout-ai';
 import { calcWorkoutXP } from '@/lib/xp';
 import { useDungeonStore } from '@/stores/dungeon.store';
+import { useRoutineStore } from '@/stores/routine.store';
 import { useUserStore } from '@/stores/user.store';
 import { useWorkoutStore } from '@/stores/workout.store';
 import type { ExerciseSet } from '@/types';
 
 const SCREEN_H = Dimensions.get('window').height;
 
-const QUICK_EXERCISES = [
-  'Bench Press', 'Squat', 'Deadlift', 'Overhead Press', 'Pull Up',
-  'Row', 'Incline Bench', 'Leg Press', 'Bicep Curl', 'Tricep Pushdown',
-];
+// ─── AI Exercise Picker ───────────────────────────────────────────────────────
+
+function ExercisePicker({
+  currentNames,
+  onSelect,
+  onClose,
+}: {
+  currentNames: string[];
+  onSelect: (name: string) => void;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState('');
+  const results = query.trim()
+    ? searchExercises(query, currentNames)
+    : getSuggestedExercises(currentNames);
+
+  const grouped = results.reduce<Record<string, typeof results>>((acc, ex) => {
+    (acc[ex.category] = acc[ex.category] ?? []).push(ex);
+    return acc;
+  }, {});
+
+  return (
+    <Modal transparent animationType="slide" onRequestClose={onClose}>
+      <View style={st.epBackdrop}>
+        <View style={st.epSheet}>
+          <View style={st.epSearchRow}>
+            <Ionicons name="search" size={16} color={BrutlColors.textDisabled} />
+            <TextInput
+              style={st.epSearchInput}
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search exercises..."
+              placeholderTextColor={BrutlColors.textDisabled}
+              autoFocus
+            />
+            <TouchableOpacity onPress={onClose}>
+              <BrutlText style={st.epCloseBtn}>✕</BrutlText>
+            </TouchableOpacity>
+          </View>
+          {!query.trim() && (
+            <BrutlText style={st.epHint}>
+              {currentNames.length > 0 ? 'SUGGESTED FOR YOUR SPLIT' : 'ALL EXERCISES'}
+            </BrutlText>
+          )}
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {Object.entries(grouped).map(([cat, items]) => (
+              <View key={cat}>
+                <BrutlText style={st.epCatLabel}>{cat.toUpperCase()}</BrutlText>
+                {items.map((ex) => (
+                  <TouchableOpacity
+                    key={ex.name}
+                    style={st.epExRow}
+                    onPress={() => { onSelect(ex.name); onClose(); }}
+                  >
+                    <BrutlText style={st.epExName}>{ex.name}</BrutlText>
+                    {ex.hasProfile && (
+                      <View style={st.epAiBadge}>
+                        <BrutlText style={st.epAiBadgeTxt}>AI</BrutlText>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
 interface LiveSet {
   weightKg: string;
@@ -425,8 +494,11 @@ export default function WorkoutScreen() {
   const multiplier = useDungeonStore((s) => s.getMultiplier)();
   const { pending: xpPending, showXP, clearXP } = useXPToast();
 
+  const pendingDay = useRoutineStore((s) => s.pendingDay);
+  const clearPending = useRoutineStore((s) => s.setPendingDay);
+
   const [exercises, setExercises] = useState<LiveExercise[]>([]);
-  const [exInput, setExInput] = useState('');
+  const [showPicker, setShowPicker] = useState(false);
   const [elapsedSecs, setElapsedSecs] = useState(0);
   const [restSecs, setRestSecs] = useState<number | null>(null);
   const [infoSheet, setInfoSheet] = useState<string | null>(null);
@@ -434,6 +506,30 @@ export default function WorkoutScreen() {
   const [rpeTargets, setRpeTargets] = useState<Record<number, number | null>>({});
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Load from routine if one was started from the routines screen
+  useEffect(() => {
+    if (!pendingDay) return;
+    const lastSession = recentLogs[0];
+    const loaded: LiveExercise[] = pendingDay.exercises.map((re) => {
+      const lastEx = lastSession?.exercises.find(
+        (e) => e.exercise.toLowerCase() === re.name.toLowerCase()
+      );
+      return {
+        name: re.name,
+        sets: Array.from({ length: re.targetSets }, () => ({
+          weightKg: lastEx ? String(lastEx.weightKg) : (re.targetWeightKg ? String(re.targetWeightKg) : '60'),
+          reps: lastEx ? String(lastEx.reps) : re.targetReps.split('-')[0],
+          done: false,
+        })),
+        prBeaten: false,
+        roastText: null,
+        notes: '',
+      };
+    });
+    setExercises(loaded);
+    clearPending(null);
+  }, [pendingDay]);
 
   // Session timer
   useEffect(() => {
@@ -472,7 +568,6 @@ export default function WorkoutScreen() {
       ...prev,
       { name, sets: [{ weightKg: defaultWeight, reps: defaultReps, done: false }], prBeaten: false, roastText: null, notes: '' },
     ]);
-    setExInput('');
   }
 
   function removeExercise(idx: number) {
@@ -639,26 +734,10 @@ export default function WorkoutScreen() {
         {/* Add exercise */}
         <View>
           <BrutlText style={st.sectionLabel}>ADD EXERCISE</BrutlText>
-          <View style={st.addRow}>
-            <TextInput
-              style={[st.input, { flex: 1 }]}
-              value={exInput}
-              onChangeText={setExInput}
-              placeholder="Exercise name"
-              placeholderTextColor={BrutlColors.textDisabled}
-              onSubmitEditing={() => addExercise(exInput)}
-            />
-            <TouchableOpacity style={st.addBtn} onPress={() => addExercise(exInput)}>
-              <BrutlText style={st.addBtnTxt}>ADD</BrutlText>
-            </TouchableOpacity>
-          </View>
-          <View style={st.chipRow}>
-            {QUICK_EXERCISES.map((name) => (
-              <TouchableOpacity key={name} style={st.chip} onPress={() => addExercise(name)}>
-                <BrutlText style={st.chipTxt}>{name}</BrutlText>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <TouchableOpacity style={st.pickerTrigger} onPress={() => setShowPicker(true)}>
+            <Ionicons name="search" size={15} color={BrutlColors.textDisabled} />
+            <BrutlText style={st.pickerPlaceholder}>Search 80+ exercises with AI suggestions...</BrutlText>
+          </TouchableOpacity>
         </View>
 
         {/* Exercise cards */}
@@ -716,6 +795,15 @@ export default function WorkoutScreen() {
           loading={saving}
         />
       </View>
+
+      {/* Exercise picker */}
+      {showPicker && (
+        <ExercisePicker
+          currentNames={exercises.map((e) => e.name)}
+          onSelect={addExercise}
+          onClose={() => setShowPicker(false)}
+        />
+      )}
 
       {/* Info sheet */}
       {infoSheet && (
@@ -780,36 +868,19 @@ const st = StyleSheet.create({
   prevStats: { fontSize: 11, color: '#888888' },
   beatLabel: { fontSize: 11, fontFamily: BrutlFonts.display, letterSpacing: 0.5 },
 
-  // Add exercise
-  addRow: { flexDirection: 'row', gap: BrutlSpacing.sm, marginBottom: BrutlSpacing.sm },
-  input: {
+  // Add exercise picker trigger
+  pickerTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: BrutlSpacing.sm,
     backgroundColor: BrutlColors.bgCard,
     borderRadius: BrutlRadius.sm,
     borderWidth: 1,
     borderColor: BrutlColors.borderVisible,
-    color: BrutlColors.textPrimary,
-    fontFamily: BrutlFonts.body,
-    fontSize: 14,
     paddingHorizontal: BrutlSpacing.md,
-    paddingVertical: BrutlSpacing.sm,
+    paddingVertical: BrutlSpacing.sm + 2,
   },
-  addBtn: {
-    backgroundColor: BrutlColors.accent,
-    borderRadius: BrutlRadius.sm,
-    paddingHorizontal: BrutlSpacing.md,
-    paddingVertical: BrutlSpacing.sm,
-    justifyContent: 'center',
-  },
-  addBtnTxt: { fontFamily: BrutlFonts.display, fontSize: 14, color: '#fff', letterSpacing: 1 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: BrutlSpacing.sm },
-  chip: {
-    paddingHorizontal: BrutlSpacing.sm,
-    paddingVertical: 4,
-    borderRadius: BrutlRadius.full,
-    borderWidth: 1,
-    borderColor: BrutlColors.borderVisible,
-  },
-  chipTxt: { fontSize: 11, color: BrutlColors.textMuted },
+  pickerPlaceholder: { fontSize: 13, color: BrutlColors.textDisabled, flex: 1 },
 
   // Exercise card
   card: {
@@ -968,6 +1039,19 @@ const st = StyleSheet.create({
     alignItems: 'center',
   },
   sheetCloseTxt: { fontSize: 12, color: BrutlColors.textMuted, fontFamily: BrutlFonts.display, letterSpacing: 1 },
+
+  // Exercise picker (ep namespace used inline)
+  epBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
+  epSheet: { backgroundColor: '#111', borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '85%', padding: BrutlSpacing.lg, paddingTop: BrutlSpacing.md },
+  epSearchRow: { flexDirection: 'row', alignItems: 'center', gap: BrutlSpacing.sm, backgroundColor: BrutlColors.bgCardSubtle, borderRadius: BrutlRadius.sm, borderWidth: 1, borderColor: BrutlColors.borderVisible, paddingHorizontal: BrutlSpacing.sm, paddingVertical: 8, marginBottom: BrutlSpacing.sm },
+  epSearchInput: { flex: 1, color: BrutlColors.textPrimary, fontSize: 14 },
+  epCloseBtn: { fontSize: 14, color: BrutlColors.textDisabled, paddingHorizontal: 4 },
+  epHint: { fontSize: 9, color: BrutlColors.textDisabled, letterSpacing: 1, marginBottom: BrutlSpacing.sm },
+  epCatLabel: { fontSize: 9, color: BrutlColors.accent, letterSpacing: 1, marginTop: BrutlSpacing.md, marginBottom: 4 },
+  epExRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: BrutlColors.border },
+  epExName: { flex: 1, fontSize: 14, color: BrutlColors.textPrimary },
+  epAiBadge: { backgroundColor: 'rgba(226,75,74,0.15)', borderWidth: 1, borderColor: BrutlColors.accent, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1, marginLeft: 8 },
+  epAiBadgeTxt: { fontSize: 8, color: BrutlColors.accent, fontFamily: BrutlFonts.display, letterSpacing: 0.5 },
 
   // Summary sheet
   summaryBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.7)' },

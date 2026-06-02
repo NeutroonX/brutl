@@ -29,4 +29,5 @@ export const STORAGE_KEYS = {
   lastOpenDate: 'brutl:last_open_date',
   dungeon: 'brutl:dungeon',
   shadows: 'brutl:shadows',
+  routines: 'brutl:routines',
 } as const;

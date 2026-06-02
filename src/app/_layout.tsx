@@ -11,6 +11,7 @@ import { useDietStore } from '@/stores/diet.store';
 import { useQuestStore } from '@/stores/quest.store';
 import { useWatchStore } from '@/stores/watch.store';
 import { useDungeonStore } from '@/stores/dungeon.store';
+import { useRoutineStore } from '@/stores/routine.store';
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({ BebasNeue_400Regular });
@@ -24,13 +25,14 @@ export default function RootLayout() {
   const loadWatch = useWatchStore((s) => s.loadFromStorage);
   const loadDungeon = useDungeonStore((s) => s.loadFromStorage);
   const checkDungeonExpiry = useDungeonStore((s) => s.checkForExpiry);
+  const loadRoutines = useRoutineStore((s) => s.loadFromStorage);
   const hasOnboarded = useUserStore((s) => s.hasOnboarded);
 
   useEffect(() => {
     StatusBar.setBarStyle('light-content');
     StatusBar.setBackgroundColor('transparent');
     StatusBar.setTranslucent(true);
-    Promise.all([loadUser(), loadRoasts(), loadWorkouts(), loadDiet(), loadQuests(), loadWatch(), loadDungeon()])
+    Promise.all([loadUser(), loadRoasts(), loadWorkouts(), loadDiet(), loadQuests(), loadWatch(), loadDungeon(), loadRoutines()])
       .then(() => checkDungeonExpiry())
       .finally(() => setReady(true));
   }, []);

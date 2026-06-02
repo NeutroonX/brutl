@@ -10,11 +10,12 @@ import { BrutlColors } from '@/constants/theme';
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
 const TABS: { route: string; icon: IoniconName; iconOutline: IoniconName }[] = [
-  { route: '/',        icon: 'home',       iconOutline: 'home-outline' },
-  { route: '/workout', icon: 'barbell',    iconOutline: 'barbell-outline' },
-  { route: '/diet',    icon: 'nutrition',  iconOutline: 'nutrition-outline' },
-  { route: '/quests',  icon: 'trophy',     iconOutline: 'trophy-outline' },
-  { route: '/stats',   icon: 'bar-chart',  iconOutline: 'bar-chart-outline' },
+  { route: '/',          icon: 'home',          iconOutline: 'home-outline' },
+  { route: '/workout',   icon: 'barbell',       iconOutline: 'barbell-outline' },
+  { route: '/routines',  icon: 'copy',          iconOutline: 'copy-outline' },
+  { route: '/diet',      icon: 'nutrition',     iconOutline: 'nutrition-outline' },
+  { route: '/quests',    icon: 'trophy',        iconOutline: 'trophy-outline' },
+  { route: '/stats',     icon: 'bar-chart',     iconOutline: 'bar-chart-outline' },
 ];
 
 const NAV_H = 62;

@@ -115,3 +115,23 @@ export interface WatchData {
   caloriesBurned: number;
   source: WatchSource;
 }
+
+export interface RoutineExercise {
+  name: string;
+  targetSets: number;
+  targetReps: string; // e.g. "8-12" or "5"
+  targetWeightKg?: number;
+}
+
+export interface RoutineDay {
+  id: string;
+  name: string; // e.g. "Push A"
+  exercises: RoutineExercise[];
+}
+
+export interface Split {
+  id: string;
+  name: string; // e.g. "PPL"
+  days: RoutineDay[];
+  createdAt: number;
+}
