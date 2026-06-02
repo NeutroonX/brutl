@@ -25,4 +25,5 @@ export const STORAGE_KEYS = {
   dietLog: 'brutl:diet_log',
   quests: 'brutl:quests',
   hasOnboarded: 'brutl:has_onboarded',
+  watchVitals: 'brutl:watch_vitals',
 } as const;

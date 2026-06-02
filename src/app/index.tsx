@@ -11,24 +11,30 @@ import { RANK_TITLES, getXPInCurrentRank, getXPRangeForRank } from '@/lib/rank';
 import { useQuestStore } from '@/stores/quest.store';
 import { useRoastStore } from '@/stores/roast.store';
 import { useUserStore } from '@/stores/user.store';
-
-const MOCKED_VITALS = [
-  { label: 'HR', value: '--', unit: 'bpm' },
-  { label: 'HRV', value: '--', unit: 'ms' },
-  { label: 'SLEEP', value: '--', unit: 'h' },
-  { label: 'RECOVERY', value: '--', unit: '%' },
-];
+import { useWatchStore } from '@/stores/watch.store';
 
 export default function HomeScreen() {
   const profile = useUserStore((s) => s.profile);
   const { currentRoast, correctionText, isStreaming, log: roastLog } = useRoastStore();
   const quests = useQuestStore((s) => s.quests);
   const activeQuests = quests.filter((q) => !q.completedAt).slice(0, 2);
+  const { vitals, syncVitals, hasPermission, isAvailable } = useWatchStore();
 
   useEffect(() => {
     if (!profile) return;
-    const payload = buildRoastPayload('APP_OPEN', profile.rank, profile.streakDays);
-    streamRoast(payload);
+    // Sync health data first, then roast with real data
+    const init = async () => {
+      if (isAvailable && hasPermission) await syncVitals();
+      const { vitals: v } = useWatchStore.getState();
+      const watchData = (v.hrv || v.sleepHours) ? {
+        date: Date.now(), restingHR: v.restingHR ?? 0, hrv: v.hrv ?? 0,
+        sleepHours: v.sleepHours ?? 0, recoveryScore: v.recoveryScore ?? 0,
+        stressLevel: 0, steps: v.steps ?? 0, caloriesBurned: 0, source: 'WEAR_OS' as const,
+      } : null;
+      const payload = buildRoastPayload('APP_OPEN', profile.rank, profile.streakDays, watchData);
+      streamRoast(payload);
+    };
+    init();
   }, []);
 
   if (!profile) return null;
@@ -56,18 +62,33 @@ export default function HomeScreen() {
           </View>
         </BrutlCard>
 
-        {/* Watch Vitals (mocked in P1) */}
+        {/* Watch Vitals */}
         <BrutlCard subtle>
           <BrutlText variant="caption" style={styles.sectionLabel}>VITALS</BrutlText>
           <View style={styles.vitalsRow}>
-            {MOCKED_VITALS.map((v) => (
+            {[
+              { label: 'HR',       value: vitals.restingHR  ?? '--', unit: 'bpm', color: vitals.restingHR  ? BrutlColors.textPrimary : BrutlColors.textDisabled },
+              { label: 'HRV',      value: vitals.hrv        ?? '--', unit: 'ms',  color: vitals.hrv        ? BrutlColors.textPrimary : BrutlColors.textDisabled },
+              { label: 'SLEEP',    value: vitals.sleepHours ?? '--', unit: 'h',   color: vitals.sleepHours ? (vitals.sleepHours >= 7 ? BrutlColors.success : BrutlColors.accent) : BrutlColors.textDisabled },
+              { label: 'RECOVERY', value: vitals.recoveryScore ?? '--', unit: '%', color: vitals.recoveryScore ? (vitals.recoveryScore >= 70 ? BrutlColors.success : vitals.recoveryScore >= 40 ? BrutlColors.warning : BrutlColors.accent) : BrutlColors.textDisabled },
+            ].map((v) => (
               <View key={v.label} style={styles.vitalBox}>
-                <BrutlText style={[styles.vitalValue, { color: BrutlColors.textPrimary }]}>{v.value}</BrutlText>
+                <BrutlText style={[styles.vitalValue, { color: v.color }]}>{String(v.value)}</BrutlText>
                 <BrutlText variant="caption">{v.unit}</BrutlText>
                 <BrutlText variant="caption" style={{ color: BrutlColors.textMuted }}>{v.label}</BrutlText>
               </View>
             ))}
           </View>
+          {!isAvailable && (
+            <BrutlText variant="caption" style={{ color: BrutlColors.textDisabled, textAlign: 'center', marginTop: BrutlSpacing.xs }}>
+              Health Connect not available
+            </BrutlText>
+          )}
+          {isAvailable && !hasPermission && (
+            <BrutlText variant="caption" style={{ color: BrutlColors.accent, textAlign: 'center', marginTop: BrutlSpacing.xs }}>
+              Connect health data in Settings
+            </BrutlText>
+          )}
         </BrutlCard>
 
         {/* Roast Card */}

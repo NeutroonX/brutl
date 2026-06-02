@@ -36,6 +36,7 @@ yarn-error.*
 
 # Claude Code
 .claude/
+.vscode/
 
 # typescript
 *.tsbuildinfo
