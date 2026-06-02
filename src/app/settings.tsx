@@ -262,7 +262,7 @@ export default function SettingsScreen() {
         <BrutlText variant="heading" style={{ fontSize: 24 }}>Settings</BrutlText>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         {/* Profile */}
         {!!profile && (

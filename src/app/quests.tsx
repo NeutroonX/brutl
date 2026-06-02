@@ -472,7 +472,7 @@ export default function QuestsScreen() {
   return (
     <View style={styles.container}>
       <XPToast amount={xpPending} onHide={clearXP} />
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <BrutlText variant="heading">Quest Board</BrutlText>
 
         {/* Dungeon Run */}

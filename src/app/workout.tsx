@@ -160,7 +160,7 @@ export default function WorkoutScreen() {
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <XPToast amount={xpPending} onHide={clearXP} multiplier={multiplier} />
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <BrutlText variant="heading">Log Workout</BrutlText>
 
         {/* Last session / empty state */}

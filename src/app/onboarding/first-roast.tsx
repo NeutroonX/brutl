@@ -47,7 +47,7 @@ export default function FirstRoastScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <BrutlText variant="heading">Your Rank.</BrutlText>
 
         <BrutlCard>

@@ -85,7 +85,7 @@ export default function DemoScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Animated.View style={[styles.header, { opacity: headerOpacity }]}>
           <BrutlText variant="heading">This is Alex.</BrutlText>
           <BrutlText variant="muted">Alex had a rough week. Here's what BRUTL said.</BrutlText>

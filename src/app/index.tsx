@@ -123,7 +123,7 @@ export default function HomeScreen() {
       )}
       <XPToast amount={streakXP} onHide={() => setStreakXP(null)} />
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         {/* Greeting header */}
         <View style={styles.header}>

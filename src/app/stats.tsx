@@ -162,7 +162,7 @@ export default function StatsScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <BrutlText variant="heading">Stats</BrutlText>
 
         {/* Rank Overview */}

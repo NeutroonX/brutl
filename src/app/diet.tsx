@@ -145,7 +145,7 @@ export default function DietScreen() {
       <PhotoScanModal visible={showPhoto} onResult={handleScannedFood} onClose={() => setShowPhoto(false)} />
       <ScanConfirmSheet food={pendingScan} onConfirm={handleConfirmScan} onCancel={() => setPendingScan(null)} />
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <BrutlText variant="heading">Diet Log</BrutlText>
           <View style={{ flexDirection: 'row', gap: BrutlSpacing.sm }}>

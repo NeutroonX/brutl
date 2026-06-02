@@ -112,7 +112,7 @@ export default function IntakeScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.heading}>
           <BrutlText variant="heading">The Stats.</BrutlText>
           <BrutlText variant="muted">Fast. Brutal. No fluff.</BrutlText>
