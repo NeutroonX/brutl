@@ -19,7 +19,6 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.brutl.app",
-      "minSdkVersion": 26,
       "permissions": [
         "android.permission.health.READ_HEART_RATE",
         "android.permission.health.READ_SLEEP",
@@ -44,7 +43,15 @@
           }
         }
       ],
-      "react-native-health-connect"
+      "react-native-health-connect",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
