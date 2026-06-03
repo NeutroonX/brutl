@@ -89,6 +89,23 @@ const styles = StyleSheet.create({
     borderColor: BrutlColors.borderVisible,
   },
   optionSelected: { backgroundColor: BrutlColors.accent, borderColor: BrutlColors.accent },
+  activityGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: BrutlSpacing.sm },
+  activityCard: {
+    width: '47.5%',
+    backgroundColor: BrutlColors.bgCard,
+    borderRadius: BrutlRadius.sm,
+    borderWidth: 1,
+    borderColor: BrutlColors.borderVisible,
+    paddingHorizontal: BrutlSpacing.md,
+    paddingVertical: BrutlSpacing.sm + 2,
+    gap: 3,
+  },
+  activityCardSelected: {
+    borderColor: BrutlColors.accent,
+    backgroundColor: `${BrutlColors.accent}10`,
+  },
+  activityName: { fontSize: 14, color: BrutlColors.textPrimary, fontFamily: 'BebasNeue_400Regular', letterSpacing: 0.5 },
+  activitySub: { fontSize: 11, color: BrutlColors.textDisabled, lineHeight: 15 },
   ctaArea: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: BrutlSpacing.xl, backgroundColor: BrutlColors.bg },
 });
 
@@ -179,17 +196,21 @@ export default function IntakeScreen() {
 
         <View style={styles.field}>
           <BrutlText variant="caption" style={styles.label}>ACTIVITY LEVEL</BrutlText>
-          <View style={{ gap: BrutlSpacing.xs }}>
-            {ACTIVITY_LEVELS.map((a) => (
-              <TouchableOpacity
-                key={a.value}
-                style={[styles.option, activityLevel === a.value && styles.optionSelected, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
-                onPress={() => { setActivityLevel(a.value); setReactions((r) => ({ ...r, activity: 'Multiplier locked.' })); }}
-              >
-                <BrutlText variant="body">{a.label}</BrutlText>
-                <BrutlText variant="caption" style={{ color: activityLevel === a.value ? '#000' : BrutlColors.textDisabled }}>{a.sub}</BrutlText>
-              </TouchableOpacity>
-            ))}
+          <View style={styles.activityGrid}>
+            {ACTIVITY_LEVELS.map((a) => {
+              const selected = activityLevel === a.value;
+              return (
+                <TouchableOpacity
+                  key={a.value}
+                  style={[styles.activityCard, selected && styles.activityCardSelected]}
+                  onPress={() => { setActivityLevel(a.value); setReactions((r) => ({ ...r, activity: 'Multiplier locked.' })); }}
+                  activeOpacity={0.75}
+                >
+                  <BrutlText style={[styles.activityName, selected && { color: BrutlColors.accent }]}>{a.label}</BrutlText>
+                  <BrutlText style={styles.activitySub}>{a.sub}</BrutlText>
+                </TouchableOpacity>
+              );
+            })}
           </View>
           {!!reactions.activity && <BrutlText style={styles.reaction}>{reactions.activity}</BrutlText>}
         </View>
