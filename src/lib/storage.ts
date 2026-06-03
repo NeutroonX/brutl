@@ -29,4 +29,5 @@ export const STORAGE_KEYS = {
   routines: 'brutl:routines',
   exerciseApiUsage: 'brutl:exercise_api_usage',
   dietFavourites: 'brutl:diet_favourites',
+  avatarUri: 'brutl:avatar_uri',
 } as const;

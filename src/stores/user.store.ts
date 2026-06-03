@@ -54,6 +54,7 @@ interface UserState {
   profile: UserProfile | null;
   hasOnboarded: boolean;
   pendingRankUp: Rank | null;
+  avatarUri: string | null;
   setProfile: (profile: UserProfile) => Promise<void>;
   updateXP: (delta: number) => Promise<void>;
   updateStreak: (days: number) => Promise<void>;
@@ -62,6 +63,7 @@ interface UserState {
   clearPendingRankUp: () => void;
   loadFromStorage: () => Promise<void>;
   setHasOnboarded: (value: boolean) => Promise<void>;
+  setAvatarUri: (uri: string) => Promise<void>;
 }
 
 
@@ -104,6 +106,7 @@ export const useUserStore = create<UserState>((set, get) => ({
   profile: null,
   hasOnboarded: false,
   pendingRankUp: null,
+  avatarUri: null,
 
   setProfile: async (profile) => {
     set({ profile });
@@ -175,10 +178,16 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   clearPendingRankUp: () => set({ pendingRankUp: null }),
 
+  setAvatarUri: async (uri) => {
+    set({ avatarUri: uri });
+    await storageSet(STORAGE_KEYS.avatarUri, uri);
+  },
+
   loadFromStorage: async () => {
     const profile = await storageGet<UserProfile>(STORAGE_KEYS.user);
     const hasOnboarded = (await storageGet<boolean>(STORAGE_KEYS.hasOnboarded)) ?? false;
-    set({ profile: profile ?? null, hasOnboarded });
+    const avatarUri = await storageGet<string>(STORAGE_KEYS.avatarUri);
+    set({ profile: profile ?? null, hasOnboarded, avatarUri: avatarUri ?? null });
   },
 
   setHasOnboarded: async (value) => {

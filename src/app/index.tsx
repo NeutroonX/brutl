@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, Animated, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 
 import { BrutlCard } from '@/components/ui/BrutlCard';
@@ -86,6 +88,8 @@ export default function HomeScreen() {
   const profile = useUserStore((s) => s.profile);
   const pendingRankUp = useUserStore((s) => s.pendingRankUp);
   const clearPendingRankUp = useUserStore((s) => s.clearPendingRankUp);
+  const avatarUri = useUserStore((s) => s.avatarUri);
+  const setAvatarUri = useUserStore((s) => s.setAvatarUri);
   const checkAndUpdateStreak = useUserStore((s) => s.checkAndUpdateStreak);
   const { currentRoast, correctionText, isStreaming, log: roastLog, lastRoastTrigger } = useRoastStore();
   const { vitals, syncVitals, hasPermission, isAvailable } = useWatchStore();
@@ -153,8 +157,31 @@ export default function HomeScreen() {
             <BrutlText style={styles.greetingText}>{greeting()}, {profile.name.split(' ')[0]}</BrutlText>
             <BrutlText style={styles.dateText}>{todayLabel()} · Day {profile.streakDays > 0 ? profile.streakDays : 1}</BrutlText>
           </View>
-          <TouchableOpacity onPress={() => router.push('/settings' as any)} hitSlop={12}>
-            <Ionicons name="settings-outline" size={22} color={BrutlColors.textMuted} />
+          <TouchableOpacity
+            onPress={() => {
+              Alert.alert('', '', [
+                { text: 'Change Photo', onPress: async () => {
+                  const result = await ImagePicker.launchImageLibraryAsync({
+                    mediaTypes: ['images'],
+                    allowsEditing: true,
+                    aspect: [1, 1],
+                    quality: 0.8,
+                  });
+                  if (!result.canceled && result.assets[0]?.uri) {
+                    setAvatarUri(result.assets[0].uri);
+                  }
+                }},
+                { text: 'Settings', onPress: () => router.push('/settings' as any) },
+                { text: 'Cancel', style: 'cancel' },
+              ]);
+            }}
+            hitSlop={8}
+          >
+            <Image
+              source={avatarUri ? { uri: avatarUri } : require('@/assets/images/pfp.jpg')}
+              style={styles.avatar}
+              contentFit="cover"
+            />
           </TouchableOpacity>
         </View>
 
@@ -320,6 +347,7 @@ const styles = StyleSheet.create({
   content: { padding: BrutlSpacing.xl, gap: BrutlSpacing.lg, paddingBottom: BrutlSpacing.xxxl },
 
   header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  avatar: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, borderColor: BrutlColors.borderVisible },
   greetingText: { fontFamily: 'BebasNeue_400Regular', fontSize: 28, color: BrutlColors.textPrimary, letterSpacing: 1 },
   dateText: { fontSize: 12, color: BrutlColors.textMuted, marginTop: 2 },
 
