@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Animated, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 
 import { BrutlCard } from '@/components/ui/BrutlCard';
@@ -161,14 +160,19 @@ export default function HomeScreen() {
             onPress={() => {
               Alert.alert('', '', [
                 { text: 'Change Photo', onPress: async () => {
-                  const result = await ImagePicker.launchImageLibraryAsync({
-                    mediaTypes: ['images'],
-                    allowsEditing: true,
-                    aspect: [1, 1],
-                    quality: 0.8,
-                  });
-                  if (!result.canceled && result.assets[0]?.uri) {
-                    setAvatarUri(result.assets[0].uri);
+                  try {
+                    const ImagePicker = await import('expo-image-picker');
+                    const result = await ImagePicker.launchImageLibraryAsync({
+                      mediaTypes: ['images'],
+                      allowsEditing: true,
+                      aspect: [1, 1],
+                      quality: 0.8,
+                    });
+                    if (!result.canceled && result.assets[0]?.uri) {
+                      setAvatarUri(result.assets[0].uri);
+                    }
+                  } catch {
+                    Alert.alert('Rebuild required', 'Run a new dev build to enable photo picking.');
                   }
                 }},
                 { text: 'Settings', onPress: () => router.push('/settings' as any) },
