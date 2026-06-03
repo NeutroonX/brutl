@@ -57,6 +57,12 @@
       ],
       "react-native-health-connect",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow BRUTL to access your photos to set a profile picture."
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "android": {
