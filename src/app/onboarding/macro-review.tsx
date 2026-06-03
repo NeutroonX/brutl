@@ -84,10 +84,9 @@ export default function MacroReviewScreen() {
   const profile = useUserStore((s) => s.profile);
   const setProfile = useUserStore((s) => s.setProfile);
   const seedInitialQuests = useQuestStore((s) => s.seedInitialQuests);
+  const insets = useSafeAreaInsets();
 
   if (!profile) return null;
-
-  const insets = useSafeAreaInsets();
 
   const calculated = calcMacroTargets(
     profile.weightKg, profile.heightCm, profile.age,
