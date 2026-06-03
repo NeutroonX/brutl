@@ -97,7 +97,9 @@ export async function streamRoast(payload: RoastPayload): Promise<void> {
           try {
             const parsed = JSON.parse(data);
             if (parsed.type === 'content_block_delta') {
-              store.appendStreamChunk(parsed.delta?.text ?? '');
+              const raw = parsed.delta?.text ?? '';
+              const clean = raw.replace(/\*\*/g, '').replace(/^[-•]\s/gm, '');
+              store.appendStreamChunk(clean);
             } else if (parsed.type === 'correction') {
               correction = parsed.text ?? '';
             }
