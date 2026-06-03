@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Animated, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -14,8 +14,8 @@ import type { Quest, QuestType, UnlockedShadow } from '@/types';
 
 // ─── Colors ────────────────────────────────────────────────────────────────
 const TYPE_COLORS: Record<QuestType, string> = {
-  DAILY:   BrutlColors.accent,
-  BOSS:    '#E2C44A',
+  DAILY:   '#E2C44A',
+  BOSS:    BrutlColors.accent,
   DUNGEON: '#4AE2C4',
   SHADOW:  '#C44AE2',
 };
@@ -447,11 +447,14 @@ export default function QuestsScreen() {
   const updateXP = useUserStore((s) => s.updateXP);
   const { pending: xpPending, showXP, clearXP } = useXPToast();
 
+  const [completedExpanded, setCompletedExpanded] = useState(false);
+
   const now = Date.now();
   const activeQuests = quests.filter((q) => !q.completedAt && q.expiresAt > now);
   const completedQuests = quests.filter((q) => !!q.completedAt);
   const unclaimedShadows = shadows.filter((s) => !s.claimed);
   const claimedShadows = shadows.filter((s) => s.claimed);
+  const totalCompleted = completedQuests.length + claimedShadows.length;
 
   async function handleClaim(id: string) {
     const quest = await completeQuest(id);
@@ -473,7 +476,9 @@ export default function QuestsScreen() {
     <View style={styles.container}>
       <XPToast amount={xpPending} onHide={clearXP} />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <BrutlText variant="heading">Quest Board</BrutlText>
+        <BrutlText style={{ fontFamily: 'BebasNeue_400Regular', fontSize: 28, color: BrutlColors.textPrimary, letterSpacing: 1.5 }}>
+          QUEST BOARD
+        </BrutlText>
 
         {/* Dungeon Run */}
         <DungeonSection />
@@ -516,18 +521,34 @@ export default function QuestsScreen() {
           </BrutlCard>
         )}
 
-        {/* Completed */}
-        {(completedQuests.length > 0 || claimedShadows.length > 0) && (
+        {/* Completed — collapsible */}
+        {totalCompleted > 0 && (
           <View>
-            <SectionHeader color={BrutlColors.textDisabled} label="COMPLETED" icon="checkmark-circle" />
-            <View style={{ gap: BrutlSpacing.md }}>
-              {completedQuests.map((q) => (
-                <QuestCard key={q.id} quest={q} onClaim={() => {}} />
-              ))}
-              {claimedShadows.map((s) => (
-                <ShadowQuestCard key={s.id} shadow={s} onReveal={() => {}} onClaim={() => {}} />
-              ))}
-            </View>
+            <TouchableOpacity
+              onPress={() => setCompletedExpanded((v) => !v)}
+              activeOpacity={0.7}
+              style={[styles.sectionHeader, { marginBottom: completedExpanded ? BrutlSpacing.md : 0 }]}
+            >
+              <Ionicons name="checkmark-circle" size={12} color={BrutlColors.textDisabled} />
+              <BrutlText variant="caption" style={{ color: BrutlColors.textDisabled, letterSpacing: 2, fontSize: 11, flex: 1 }}>
+                {totalCompleted} COMPLETED THIS WEEK
+              </BrutlText>
+              <Ionicons
+                name={completedExpanded ? 'chevron-up' : 'chevron-down'}
+                size={14}
+                color={BrutlColors.textDisabled}
+              />
+            </TouchableOpacity>
+            {completedExpanded && (
+              <View style={{ gap: BrutlSpacing.md }}>
+                {completedQuests.map((q) => (
+                  <QuestCard key={q.id} quest={q} onClaim={() => {}} />
+                ))}
+                {claimedShadows.map((s) => (
+                  <ShadowQuestCard key={s.id} shadow={s} onReveal={() => {}} onClaim={() => {}} />
+                ))}
+              </View>
+            )}
           </View>
         )}
       </ScrollView>
