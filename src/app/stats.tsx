@@ -924,7 +924,7 @@ export default function StatsScreen() {
     <View style={s.container}>
       <ScrollView
         style={s.scroll}
-        contentContainerStyle={[s.content, { paddingTop: insets.top, paddingBottom: insets.bottom + BrutlSpacing.xxxl }]}
+        contentContainerStyle={[s.content, { paddingBottom: insets.bottom + BrutlSpacing.xxxl }]}
         showsVerticalScrollIndicator={false}
       >
         <BrutlText style={s.screenTitle}>Stats</BrutlText>
@@ -974,10 +974,8 @@ const s = StyleSheet.create({
   screenTitle: {
     fontFamily: 'BebasNeue_400Regular',
     fontSize: 32,
-    lineHeight: 34,
     color: BrutlColors.textPrimary,
     letterSpacing: 1,
-    marginBottom: 4,
   },
 
   sectionLabel: {
