@@ -4,7 +4,7 @@ export type ActivityLevel = 'SEDENTARY' | 'LIGHT' | 'MODERATE' | 'ACTIVE' | 'VER
 export type WeakArea = 'UPPER' | 'LOWER' | 'CARDIO' | 'DIET' | 'SLEEP' | 'MENTAL' | 'CONSISTENCY' | 'FLEXIBILITY';
 export type Rank = 'E' | 'D' | 'C' | 'B' | 'A' | 'S';
 export type RoastTrigger = 'APP_OPEN' | 'MISSED_WORKOUT' | 'OFF_PLAN' | 'WEAK_LIFT' | 'POOR_RECOVERY' | 'WORKOUT_COMPLETE' | 'MEAL_LOGGED';
-export type QuestType = 'DAILY' | 'BOSS' | 'DUNGEON' | 'SHADOW';
+
 export type WatchSource = 'SAMSUNG' | 'WEAR_OS' | 'GARMIN' | 'FITBIT' | 'WHOOP' | 'NONE';
 
 export interface UserProfile {
@@ -76,39 +76,6 @@ export interface RoastEntry {
   correctionText: string;
 }
 
-export interface Quest {
-  id: string;
-  type: QuestType;
-  title: string;
-  description: string;
-  xpReward: number;
-  expiresAt: number;
-  completedAt: number | null;
-  progress: number;
-}
-
-export interface DungeonRun {
-  id: string;
-  startedAt: number;
-  currentDay: number;       // 1–7
-  dayStartedAt: number;     // timestamp when current day became active
-  daysCompleted: number[];  // completion timestamps, index 0–6
-  todayWorkoutDuration: number;
-  todayProteinRatio: number;
-  status: 'ACTIVE' | 'COMPLETED' | 'FAILED';
-  xpMultiplierUntil: number | null;
-}
-
-export interface UnlockedShadow {
-  id: string;
-  triggerId: string;
-  title: string;
-  description: string;
-  xpReward: number;
-  unlockedAt: number;
-  claimed: boolean;
-  revealed: boolean;
-}
 
 export interface WatchData {
   date: number;

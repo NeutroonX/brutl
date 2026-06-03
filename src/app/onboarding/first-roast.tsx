@@ -10,7 +10,6 @@ import { XPBar } from '@/components/ui/XPBar';
 import { BrutlColors, BrutlSpacing } from '@/constants/theme';
 import { buildRoastPayload, streamRoast } from '@/lib/roast-engine';
 import { RANK_TITLES } from '@/lib/rank';
-import { useQuestStore } from '@/stores/quest.store';
 import { useRoastStore } from '@/stores/roast.store';
 import { useUserStore } from '@/stores/user.store';
 
@@ -29,13 +28,10 @@ export default function FirstRoastScreen() {
   const profile = useUserStore((s) => s.profile);
   const setHasOnboarded = useUserStore((s) => s.setHasOnboarded);
   const { currentRoast, correctionText, isStreaming } = useRoastStore();
-  const seedInitialQuests = useQuestStore((s) => s.seedInitialQuests);
-
   useEffect(() => {
     if (!profile) return;
     const payload = buildRoastPayload('APP_OPEN', profile.rank, profile.streakDays);
     streamRoast(payload).catch(() => {});
-    seedInitialQuests().catch(() => {});
   }, []);
 
   async function handleBegin() {
@@ -78,14 +74,6 @@ export default function FirstRoastScreen() {
           </BrutlCard>
         )}
 
-        <BrutlCard subtle>
-          <BrutlText variant="caption" style={{ color: BrutlColors.accent, marginBottom: BrutlSpacing.xs }}>
-            FIRST QUEST
-          </BrutlText>
-          <BrutlText variant="body">First Blood</BrutlText>
-          <BrutlText variant="muted">Log your first workout and hit your protein target today.</BrutlText>
-          <BrutlText variant="accent" style={{ marginTop: BrutlSpacing.xs }}>+150 XP</BrutlText>
-        </BrutlCard>
       </ScrollView>
 
       <View style={styles.ctaArea}>

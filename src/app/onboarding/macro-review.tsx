@@ -17,7 +17,6 @@ import { BrutlCard } from '@/components/ui/BrutlCard';
 import { BrutlText } from '@/components/ui/BrutlText';
 import { BrutlColors, BrutlFonts, BrutlRadius, BrutlSpacing } from '@/constants/theme';
 import { calcMacroTargets, useUserStore } from '@/stores/user.store';
-import { useQuestStore } from '@/stores/quest.store';
 import type { MacroTargets } from '@/types';
 
 const ACTIVITY_LABELS: Record<string, string> = {
@@ -83,7 +82,6 @@ function MacroEditCard({
 export default function MacroReviewScreen() {
   const profile = useUserStore((s) => s.profile);
   const setProfile = useUserStore((s) => s.setProfile);
-  const seedInitialQuests = useQuestStore((s) => s.seedInitialQuests);
   const insets = useSafeAreaInsets();
 
   if (!profile) return null;
@@ -108,7 +106,6 @@ export default function MacroReviewScreen() {
   async function handleLock() {
     setSaving(true);
     await setProfile({ ...profile, macroTargets: macros });
-    await seedInitialQuests();
     router.push('/onboarding/first-roast' as any);
   }
 

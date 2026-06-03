@@ -10,7 +10,7 @@ import { BrutlButton } from '@/components/ui/BrutlButton';
 import { BrutlText } from '@/components/ui/BrutlText';
 import { Ionicons } from '@expo/vector-icons';
 import { BrutlColors, BrutlFonts, BrutlRadius, BrutlSpacing } from '@/constants/theme';
-import { useUserStore, buildUserProfile } from '@/stores/user.store';
+import { useUserStore, buildUserProfile, calcMacroTargets } from '@/stores/user.store';
 import { useWatchStore } from '@/stores/watch.store';
 import { storageRemove, STORAGE_KEYS } from '@/lib/storage';
 import type { ActivityLevel, Gender, Goal, WeakArea } from '@/types';
@@ -146,17 +146,19 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
   const [weakAreas, setWeakAreas] = useState<WeakArea[]>(
     Array.isArray(profile?.weakArea) ? profile.weakArea : profile?.weakArea ? [profile.weakArea as WeakArea] : ['DIET']
   );
+  const [macros, setMacros] = useState({ ...profile?.macroTargets ?? { calories: 2000, proteinG: 150, carbsG: 200, fatG: 65 } });
   const [saving, setSaving] = useState(false);
+
+  function patchMacro(field: string, raw: string) {
+    const n = parseInt(raw);
+    if (!isNaN(n) && n >= 0) setMacros((m) => ({ ...m, [field]: n }));
+  }
 
   async function handleSave() {
     if (!profile || !name.trim()) return;
     setSaving(true);
     const newWeightKg = parseFloat(weightKg) || profile.weightKg;
     const newHeightCm = parseInt(heightCm) || profile.heightCm;
-    // Recalculate macro targets if weight or goal changed
-    const macroTargets = (newWeightKg !== profile.weightKg || goal !== profile.goal || activityLevel !== profile.activityLevel || gender !== profile.gender)
-      ? buildUserProfile({ name: name.trim(), age: profile.age, weightKg: newWeightKg, heightCm: newHeightCm, gender, activityLevel, goal, weakArea: weakAreas }).macroTargets
-      : profile.macroTargets;
     await setProfile({
       ...profile,
       name: name.trim(),
@@ -166,7 +168,7 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
       activityLevel,
       goal,
       weakArea: weakAreas,
-      macroTargets,
+      macroTargets: macros,
     });
     setSaving(false);
     onClose();
@@ -243,6 +245,30 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
                 >
                   <BrutlText variant="caption">{w.label}</BrutlText>
                 </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View>
+            <BrutlText style={styles.fieldLabel}>MACRO TARGETS</BrutlText>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: BrutlSpacing.sm }}>
+              {[
+                { key: 'calories', label: 'KCAL',    value: macros.calories },
+                { key: 'proteinG', label: 'PROTEIN', value: macros.proteinG },
+                { key: 'carbsG',   label: 'CARBS',   value: macros.carbsG },
+                { key: 'fatG',     label: 'FAT',     value: macros.fatG },
+              ].map((m) => (
+                <View key={m.key} style={{ width: '47%' }}>
+                  <BrutlText style={[styles.fieldLabel, { marginBottom: 4 }]}>{m.label}</BrutlText>
+                  <TextInput
+                    style={styles.input}
+                    value={String(m.value)}
+                    onChangeText={(v) => patchMacro(m.key, v)}
+                    keyboardType="number-pad"
+                    placeholderTextColor={BrutlColors.textDisabled}
+                    selectTextOnFocus
+                  />
+                </View>
               ))}
             </View>
           </View>

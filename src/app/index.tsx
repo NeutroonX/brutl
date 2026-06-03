@@ -14,8 +14,6 @@ import { StreakTauntCard } from '@/components/StreakTauntCard';
 import { BrutlColors, BrutlSpacing } from '@/constants/theme';
 import { buildRoastPayload, shouldFireAppOpenRoast, streamRoast } from '@/lib/roast-engine';
 import { RANK_TITLES, getXPForNextRank, getXPInCurrentRank, getXPRangeForRank } from '@/lib/rank';
-import { useDungeonStore } from '@/stores/dungeon.store';
-import { useQuestStore } from '@/stores/quest.store';
 import { useRoastStore } from '@/stores/roast.store';
 import { useUserStore } from '@/stores/user.store';
 import { useWatchStore } from '@/stores/watch.store';
@@ -90,17 +88,8 @@ export default function HomeScreen() {
   const clearPendingRankUp = useUserStore((s) => s.clearPendingRankUp);
   const checkAndUpdateStreak = useUserStore((s) => s.checkAndUpdateStreak);
   const { currentRoast, correctionText, isStreaming, log: roastLog, lastRoastTrigger } = useRoastStore();
-  const refreshDailyQuests = useQuestStore((s) => s.refreshDailyQuests);
-  const quests = useQuestStore((s) => s.quests);
-  const activeQuests = quests.filter((q) => !q.completedAt && q.expiresAt > Date.now()).slice(0, 3);
   const { vitals, syncVitals, hasPermission, isAvailable } = useWatchStore();
   const workoutLogs = useWorkoutStore((s) => s.logs);
-  const dungeonRun = useDungeonStore((s) => s.run);
-  const dungeonMultiplier = useDungeonStore((s) => s.getMultiplier)();
-  const multiplierActive = dungeonMultiplier > 1;
-  const multiplierDaysLeft = dungeonRun?.xpMultiplierUntil
-    ? Math.max(0, Math.ceil((dungeonRun.xpMultiplierUntil - Date.now()) / 86_400_000))
-    : 0;
 
   const [streakXP, setStreakXP] = useState<number | null>(null);
 
@@ -109,7 +98,6 @@ export default function HomeScreen() {
     checkAndUpdateStreak()
       .then((bonus: number) => { if (bonus > 0) setStreakXP(bonus); })
       .catch(() => {});
-    refreshDailyQuests().catch(() => {});
     const init = async () => {
       try {
         if (isAvailable && hasPermission) await syncVitals();
@@ -170,15 +158,6 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Dungeon multiplier */}
-        {multiplierActive && (
-          <View style={styles.multiplierBanner}>
-            <Ionicons name="shield" size={13} color="#4AE2C4" />
-            <BrutlText style={styles.multiplierText}>
-              1.5× XP ACTIVE — {multiplierDaysLeft}d remaining
-            </BrutlText>
-          </View>
-        )}
 
         {/* Hero Rank Card */}
         {(() => {
@@ -317,26 +296,6 @@ export default function HomeScreen() {
           </BrutlCard>
         ) : null}
 
-        {/* Active Quests */}
-        {activeQuests.length > 0 && (
-          <View style={{ gap: BrutlSpacing.sm }}>
-            <BrutlText style={styles.sectionLabel}>ACTIVE QUESTS</BrutlText>
-            {activeQuests.map((q) => (
-              <BrutlCard key={q.id} subtle>
-                <View style={styles.questItem}>
-                  <View style={[styles.questDot, { backgroundColor: q.type === 'BOSS' ? '#E2C44A' : BrutlColors.accent }]} />
-                  <View style={styles.questInfo}>
-                    <BrutlText variant="body">{q.title}</BrutlText>
-                    <View style={styles.questProgressTrack}>
-                      <View style={[styles.questProgressFill, { width: `${Math.round(q.progress * 100)}%` }]} />
-                    </View>
-                  </View>
-                  <BrutlText variant="accent" style={{ fontSize: 13 }}>+{q.xpReward}</BrutlText>
-                </View>
-              </BrutlCard>
-            ))}
-          </View>
-        )}
 
         {/* Weekly XP Chart */}
         <BrutlCard subtle>
@@ -363,14 +322,6 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   greetingText: { fontFamily: 'BebasNeue_400Regular', fontSize: 28, color: BrutlColors.textPrimary, letterSpacing: 1 },
   dateText: { fontSize: 12, color: BrutlColors.textMuted, marginTop: 2 },
-
-  multiplierBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: BrutlSpacing.sm,
-    backgroundColor: 'rgba(74,226,196,0.08)',
-    borderWidth: 1, borderColor: 'rgba(74,226,196,0.25)',
-    borderRadius: 8, paddingHorizontal: BrutlSpacing.md, paddingVertical: BrutlSpacing.sm,
-  },
-  multiplierText: { fontSize: 12, color: '#4AE2C4', flex: 1, letterSpacing: 0.5 },
 
   rankCard: { position: 'relative' },
 
@@ -408,9 +359,4 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
 
-  questItem: { flexDirection: 'row', alignItems: 'center', gap: BrutlSpacing.md },
-  questDot: { width: 8, height: 8, borderRadius: 4 },
-  questInfo: { flex: 1, gap: 6 },
-  questProgressTrack: { height: 3, backgroundColor: BrutlColors.border, borderRadius: 9999, overflow: 'hidden' },
-  questProgressFill: { position: 'absolute', top: 0, bottom: 0, left: 0, backgroundColor: BrutlColors.accent },
 });

@@ -13,7 +13,6 @@ const TABS: { route: string; icon: IoniconName; iconOutline: IoniconName }[] = [
   { route: '/',        icon: 'home',       iconOutline: 'home-outline' },
   { route: '/workout', icon: 'barbell',    iconOutline: 'barbell-outline' },
   { route: '/diet',    icon: 'nutrition',  iconOutline: 'nutrition-outline' },
-  { route: '/quests',  icon: 'trophy',     iconOutline: 'trophy-outline' },
   { route: '/stats',   icon: 'bar-chart',  iconOutline: 'bar-chart-outline' },
 ];
 
