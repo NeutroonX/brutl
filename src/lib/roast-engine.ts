@@ -43,6 +43,15 @@ export function buildRoastPayload(
   return payload;
 }
 
+const ROAST_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+
+export function shouldFireAppOpenRoast(): boolean {
+  const { lastRoastTimestamp, lastRoastTrigger } = useRoastStore.getState();
+  if (!lastRoastTimestamp) return true;
+  if (lastRoastTrigger !== 'APP_OPEN') return true;
+  return Date.now() - lastRoastTimestamp > ROAST_COOLDOWN_MS;
+}
+
 // Streams the roast from Supabase edge function and updates roast store in real-time
 export async function streamRoast(payload: RoastPayload): Promise<void> {
   const store = useRoastStore.getState();
@@ -114,6 +123,8 @@ async function mockRoast(payload: RoastPayload): Promise<void> {
     OFF_PLAN: `${Math.round((1 - (payload.dietCompliance ?? 1)) * 100)}% off your macros. Your body doesn't care about your excuses.`,
     WEAK_LIFT: `Below your average on ${payload.lastWorkout?.exercise ?? 'that lift'}. Progress doesn't care how tired you are.`,
     POOR_RECOVERY: `HRV at ${payload.hrv ?? '?'}, sleep at ${payload.sleepHours ?? '?'}h. Even depleted, you can do the work — just smarter.`,
+    WORKOUT_COMPLETE: `Session logged. ${payload.streak} days straight. Now recover like you trained — because the next session starts now.`,
+    MEAL_LOGGED: `Macros tracked. ${payload.dietCompliance !== undefined ? `${Math.round(payload.dietCompliance * 100)}% compliance so far.` : 'Stay consistent.'} The fork is where most people lose.`,
   };
   const corrections: Record<RoastTrigger, string> = {
     APP_OPEN: 'Log a workout today. No half-reps.',
@@ -121,6 +132,8 @@ async function mockRoast(payload: RoastPayload): Promise<void> {
     OFF_PLAN: 'Prep your meals tonight. One decision eliminates a hundred failures.',
     WEAK_LIFT: 'Add 2.5kg next session. Small increments compound.',
     POOR_RECOVERY: 'Sleep 8h tonight. No screens after 10pm.',
+    WORKOUT_COMPLETE: 'Eat within 30 minutes. Protein first.',
+    MEAL_LOGGED: 'Hit your protein target before hitting your calorie ceiling.',
   };
 
   const text = roasts[payload.triggerType];

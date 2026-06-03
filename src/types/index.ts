@@ -1,7 +1,7 @@
 export type Goal = 'FAT_LOSS' | 'MUSCLE_GAIN' | 'RECOMP';
 export type WeakArea = 'UPPER' | 'LOWER' | 'CARDIO' | 'DIET' | 'SLEEP' | 'MENTAL' | 'CONSISTENCY' | 'FLEXIBILITY';
 export type Rank = 'E' | 'D' | 'C' | 'B' | 'A' | 'S';
-export type RoastTrigger = 'APP_OPEN' | 'MISSED_WORKOUT' | 'OFF_PLAN' | 'WEAK_LIFT' | 'POOR_RECOVERY';
+export type RoastTrigger = 'APP_OPEN' | 'MISSED_WORKOUT' | 'OFF_PLAN' | 'WEAK_LIFT' | 'POOR_RECOVERY' | 'WORKOUT_COMPLETE' | 'MEAL_LOGGED';
 export type QuestType = 'DAILY' | 'BOSS' | 'DUNGEON' | 'SHADOW';
 export type WatchSource = 'SAMSUNG' | 'WEAR_OS' | 'GARMIN' | 'FITBIT' | 'WHOOP' | 'NONE';
 

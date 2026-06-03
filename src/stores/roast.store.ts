@@ -8,6 +8,8 @@ interface RoastState {
   currentRoast: string;
   correctionText: string;
   isStreaming: boolean;
+  lastRoastTimestamp: number | null;
+  lastRoastTrigger: RoastTrigger | null;
   appendStreamChunk: (chunk: string) => void;
   startStream: () => void;
   finishStream: (correction: string, triggerType: RoastTrigger) => Promise<void>;
@@ -19,6 +21,8 @@ export const useRoastStore = create<RoastState>((set, get) => ({
   currentRoast: '',
   correctionText: '',
   isStreaming: false,
+  lastRoastTimestamp: null,
+  lastRoastTrigger: null,
 
   startStream: () => set({ currentRoast: '', correctionText: '', isStreaming: true }),
 
@@ -27,20 +31,28 @@ export const useRoastStore = create<RoastState>((set, get) => ({
 
   finishStream: async (correction, triggerType) => {
     const { currentRoast, log } = get();
+    const now = Date.now();
     const entry: RoastEntry = {
-      id: Date.now().toString(),
-      timestamp: Date.now(),
+      id: now.toString(),
+      timestamp: now,
       triggerType,
       roastText: currentRoast,
       correctionText: correction,
     };
     const updated = [entry, ...log].slice(0, 100);
-    set({ log: updated, correctionText: correction, isStreaming: false });
+    set({ log: updated, correctionText: correction, isStreaming: false, lastRoastTimestamp: now, lastRoastTrigger: triggerType });
     await storageSet(STORAGE_KEYS.roastLog, updated);
   },
 
   loadFromStorage: async () => {
     const log = await storageGet<RoastEntry[]>(STORAGE_KEYS.roastLog);
-    if (log) set({ log });
+    if (log) {
+      const latest = log[0];
+      set({
+        log,
+        lastRoastTimestamp: latest?.timestamp ?? null,
+        lastRoastTrigger: latest?.triggerType ?? null,
+      });
+    }
   },
 }));

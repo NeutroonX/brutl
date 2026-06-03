@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
@@ -12,7 +12,7 @@ import { RankUpModal } from '@/components/RankUpModal';
 import { WeeklyXPChart } from '@/components/WeeklyXPChart';
 import { StreakTauntCard } from '@/components/StreakTauntCard';
 import { BrutlColors, BrutlSpacing } from '@/constants/theme';
-import { buildRoastPayload, streamRoast } from '@/lib/roast-engine';
+import { buildRoastPayload, shouldFireAppOpenRoast, streamRoast } from '@/lib/roast-engine';
 import { RANK_TITLES, getXPForNextRank, getXPInCurrentRank, getXPRangeForRank } from '@/lib/rank';
 import { useDungeonStore } from '@/stores/dungeon.store';
 import { useQuestStore } from '@/stores/quest.store';
@@ -21,6 +21,29 @@ import { useUserStore } from '@/stores/user.store';
 import { useWatchStore } from '@/stores/watch.store';
 import { useWorkoutStore } from '@/stores/workout.store';
 import type { Rank } from '@/types';
+
+const TRIGGER_LABELS: Record<string, string> = {
+  APP_OPEN: 'MORNING DISPATCH',
+  MISSED_WORKOUT: 'MISSED WORKOUT',
+  OFF_PLAN: 'DIET SLIP',
+  WEAK_LIFT: 'POST-WORKOUT',
+  POOR_RECOVERY: 'RECOVERY ALERT',
+  WORKOUT_COMPLETE: 'WORKOUT COMPLETE',
+  MEAL_LOGGED: 'MEAL LOGGED',
+};
+
+function BlinkCursor() {
+  const opacity = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 0, duration: 500, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+      ])
+    ).start();
+  }, [opacity]);
+  return <Animated.Text style={{ opacity, color: BrutlColors.accent, fontWeight: '700' }}>|</Animated.Text>;
+}
 
 const NEXT_RANK: Record<Rank, Rank | null> = {
   E: 'D', D: 'C', C: 'B', B: 'A', A: 'S', S: null,
@@ -66,7 +89,7 @@ export default function HomeScreen() {
   const pendingRankUp = useUserStore((s) => s.pendingRankUp);
   const clearPendingRankUp = useUserStore((s) => s.clearPendingRankUp);
   const checkAndUpdateStreak = useUserStore((s) => s.checkAndUpdateStreak);
-  const { currentRoast, correctionText, isStreaming, log: roastLog } = useRoastStore();
+  const { currentRoast, correctionText, isStreaming, log: roastLog, lastRoastTrigger } = useRoastStore();
   const refreshDailyQuests = useQuestStore((s) => s.refreshDailyQuests);
   const quests = useQuestStore((s) => s.quests);
   const activeQuests = quests.filter((q) => !q.completedAt && q.expiresAt > Date.now()).slice(0, 3);
@@ -92,13 +115,22 @@ export default function HomeScreen() {
         if (isAvailable && hasPermission) await syncVitals();
       } catch { }
       const { vitals: v } = useWatchStore.getState();
-      const watchData = (v.hrv || v.sleepHours) ? {
+      const hasVitals = !!(v.hrv || v.sleepHours || v.recoveryScore);
+      const hasHistory = workoutLogs.length > 0;
+      if (!hasVitals && !hasHistory) return; // show static placeholder, no API call
+      if (!shouldFireAppOpenRoast()) return; // roasted within last 6h, show cached roast
+      const watchData = hasVitals ? {
         date: Date.now(), restingHR: v.restingHR ?? 0, hrv: v.hrv ?? 0,
         sleepHours: v.sleepHours ?? 0, recoveryScore: v.recoveryScore ?? 0,
         stressLevel: 0, steps: v.steps ?? 0, caloriesBurned: 0, source: 'WEAR_OS' as const,
       } : null;
+      const missedDays = workoutLogs.length > 0
+        ? Math.floor((Date.now() - workoutLogs[0].date) / 86_400_000)
+        : 0;
       if (v.recoveryScore !== null && v.recoveryScore < 40) {
         streamRoast(buildRoastPayload('POOR_RECOVERY', profile.rank, profile.streakDays, watchData)).catch(() => {});
+      } else if (missedDays >= 2) {
+        streamRoast(buildRoastPayload('MISSED_WORKOUT', profile.rank, profile.streakDays, watchData, null, undefined, missedDays)).catch(() => {});
       } else {
         streamRoast(buildRoastPayload('APP_OPEN', profile.rank, profile.streakDays, watchData)).catch(() => {});
       }
@@ -115,6 +147,8 @@ export default function HomeScreen() {
   const latestRoast = currentRoast || roastLog[0]?.roastText || '';
   const latestCorrection = isStreaming ? '' : correctionText || roastLog[0]?.correctionText || '';
   const noVitals = !vitals.restingHR && !vitals.hrv && !vitals.sleepHours && !vitals.recoveryScore;
+  const hasNoData = noVitals && workoutLogs.length === 0;
+  const activeTrigger = isStreaming ? 'INCOMING' : (lastRoastTrigger ? (TRIGGER_LABELS[lastRoastTrigger] ?? 'BRUTL DISPATCH') : null);
 
   return (
     <View style={styles.container}>
@@ -239,23 +273,49 @@ export default function HomeScreen() {
           )}
         </BrutlCard>
 
-        {/* Roast */}
-        {!!latestRoast && (
+        {/* Roast / Placeholder */}
+        {hasNoData ? (
           <BrutlCard>
             <View style={styles.roastBox}>
-              <BrutlText style={styles.sectionLabel}>
-                {isStreaming ? 'INCOMING ROAST' : "TODAY'S ROAST"}
+              <View style={styles.roastHeader}>
+                <Ionicons name="flash" size={11} color={BrutlColors.accent} />
+                <BrutlText style={styles.sectionLabel}>BRUTL DISPATCH</BrutlText>
+              </View>
+              <BrutlText style={styles.roastBody}>
+                "The system is watching. Log your first workout — data is the only language BRUTL speaks."
               </BrutlText>
-              <BrutlText variant="body">
-                {latestRoast}
-                {isStreaming && <BrutlText style={styles.cursor}>|</BrutlText>}
+              <View style={styles.roastDivider} />
+              <View style={styles.correctionRow}>
+                <View style={styles.correctionDot} />
+                <BrutlText style={styles.correctionLabel}>Start tracking to unlock daily roasts.</BrutlText>
+              </View>
+            </View>
+          </BrutlCard>
+        ) : (isStreaming || !!latestRoast) ? (
+          <BrutlCard>
+            <View style={styles.roastBox}>
+              <View style={styles.roastHeader}>
+                <Ionicons name="flash" size={11} color={BrutlColors.accent} />
+                <BrutlText style={styles.sectionLabel}>{activeTrigger ?? 'BRUTL DISPATCH'}</BrutlText>
+                {isStreaming && (
+                  <View style={styles.liveDot} />
+                )}
+              </View>
+              <BrutlText style={styles.roastBody}>
+                {latestRoast}{isStreaming && <BlinkCursor />}
               </BrutlText>
               {!!latestCorrection && (
-                <BrutlText variant="accent" style={{ marginTop: 4 }}>→ {latestCorrection}</BrutlText>
+                <>
+                  <View style={styles.roastDivider} />
+                  <View style={styles.correctionRow}>
+                    <View style={styles.correctionDot} />
+                    <BrutlText style={styles.correctionLabel}>{latestCorrection}</BrutlText>
+                  </View>
+                </>
               )}
             </View>
           </BrutlCard>
-        )}
+        ) : null}
 
         {/* Active Quests */}
         {activeQuests.length > 0 && (
@@ -334,8 +394,19 @@ const styles = StyleSheet.create({
   vitalLabel: { fontSize: 10, color: BrutlColors.textMuted, letterSpacing: 0.5 },
   vitalsNote: { fontSize: 11, color: BrutlColors.textDisabled, textAlign: 'center', marginTop: BrutlSpacing.sm },
 
-  roastBox: { gap: BrutlSpacing.sm },
-  cursor: { color: BrutlColors.accent, fontWeight: '700' },
+  roastBox: { gap: 10 },
+  roastHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  roastBody: { fontSize: 14, color: BrutlColors.textPrimary, lineHeight: 21, letterSpacing: 0.1 },
+  roastDivider: { height: 1, backgroundColor: `${BrutlColors.accent}25`, marginVertical: 2 },
+  correctionRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  correctionDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: BrutlColors.accent, marginTop: 5 },
+  correctionLabel: { flex: 1, fontSize: 13, color: BrutlColors.accent, lineHeight: 19 },
+  liveDot: {
+    width: 6, height: 6, borderRadius: 3,
+    backgroundColor: BrutlColors.accent,
+    marginLeft: 'auto',
+    opacity: 0.9,
+  },
 
   questItem: { flexDirection: 'row', alignItems: 'center', gap: BrutlSpacing.md },
   questDot: { width: 8, height: 8, borderRadius: 4 },
