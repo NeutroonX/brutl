@@ -974,6 +974,7 @@ const s = StyleSheet.create({
   screenTitle: {
     fontFamily: 'BebasNeue_400Regular',
     fontSize: 32,
+    lineHeight: 34,
     color: BrutlColors.textPrimary,
     letterSpacing: 1,
   },
