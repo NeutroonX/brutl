@@ -30,4 +30,9 @@ export const STORAGE_KEYS = {
   exerciseApiUsage: 'brutl:exercise_api_usage',
   dietFavourites: 'brutl:diet_favourites',
   avatarUri: 'brutl:avatar_uri',
+  apiKeys: 'brutl:api_keys',
+  water: 'brutl:water',
+  medications: 'brutl:medications',
+  medicationTaken: 'brutl:medication_taken',
+  weightLog: 'brutl:weight_log',
 } as const;

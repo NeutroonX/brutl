@@ -108,3 +108,9 @@ export interface Split {
   days: RoutineDay[];
   createdAt: number;
 }
+
+export interface WeightEntry {
+  id: string;
+  date: number;
+  weightKg: number;
+}
