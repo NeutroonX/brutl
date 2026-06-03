@@ -180,7 +180,7 @@ const st = StyleSheet.create({
   container: { flex: 1, backgroundColor: BrutlColors.bg },
   content: { gap: BrutlSpacing.lg, paddingHorizontal: BrutlSpacing.xl, paddingBottom: 120 },
   heading: { gap: BrutlSpacing.xs },
-  title: { fontFamily: 'BebasNeue_400Regular', fontSize: 32, color: BrutlColors.textPrimary, letterSpacing: 1 },
+  title: { fontFamily: 'BebasNeue_400Regular', fontSize: 32, lineHeight: 40, color: BrutlColors.textPrimary, letterSpacing: 1 },
 
   methodRow: { flexDirection: 'row', alignItems: 'center', gap: BrutlSpacing.sm, marginBottom: BrutlSpacing.sm },
   resetBtn: {
