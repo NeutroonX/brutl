@@ -1,4 +1,4 @@
-const GEMINI_KEY = 'REDACTED_GEMINI_KEY';
+const GEMINI_KEY = Deno.env.get('GEMINI_API_KEY') ?? '';
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_KEY}`;
 
 const corsHeaders = {

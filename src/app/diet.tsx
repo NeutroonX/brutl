@@ -27,7 +27,7 @@ import type { MealEntry } from '@/types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const USDA_KEY = 'LkQgJO8KFYQIlOgL9RQLK6IfhhAJ0t4JiJKxy9HY';
+const USDA_KEY = process.env.EXPO_PUBLIC_USDA_API_KEY ?? '';
 
 const MACRO_COLORS = {
   kcal:    '#E8E8E8',
