@@ -28,15 +28,6 @@ const TYPE_ICONS: Record<QuestType, string> = {
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-function timeUntil(ts: number): string {
-  const diff = ts - Date.now();
-  if (diff <= 0) return 'Expired';
-  const h = Math.floor(diff / 3_600_000);
-  const m = Math.floor((diff % 3_600_000) / 60_000);
-  if (h > 24) return `${Math.floor(h / 24)}d left`;
-  if (h > 0) return `${h}h ${m}m left`;
-  return `${m}m left`;
-}
 
 // ─── Styles ────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
@@ -169,12 +160,14 @@ function QuestCard({ quest, onClaim }: { quest: Quest; onClaim: (id: string) => 
             <View style={[styles.progressFill, { width: `${Math.round(quest.progress * 100)}%`, backgroundColor: color }]} />
           </View>
 
-          <View style={styles.questMeta}>
-            <BrutlText variant="caption" style={{ color: claimable ? color : BrutlColors.textMuted }}>
-              {claimable ? '✓ Ready to claim' : `${Math.round(quest.progress * 100)}% complete`}
+          {!claimable && (
+            <BrutlText variant="caption" style={{ color: BrutlColors.textMuted }}>
+              {Math.round(quest.progress * 100)}% complete
             </BrutlText>
-            <BrutlText variant="caption">{timeUntil(quest.expiresAt)}</BrutlText>
-          </View>
+          )}
+          {claimable && (
+            <BrutlText variant="caption" style={{ color }}>Ready to claim</BrutlText>
+          )}
 
           {claimable && (
             <TouchableOpacity
