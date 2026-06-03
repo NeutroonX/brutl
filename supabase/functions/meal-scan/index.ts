@@ -1,9 +1,12 @@
+const GEMINI_KEY = 'REDACTED_GEMINI_KEY';
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_KEY}`;
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const PROMPT = `You are a nutritionist AI. Look at this meal photo and estimate the macros for the full portion visible.
+const PROMPT = `Look at this meal photo and estimate the nutritional content for the full portion visible.
 
 Return ONLY valid JSON with these exact keys, no markdown, no explanation:
 {
@@ -30,30 +33,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const response = await fetch(GEMINI_URL, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENROUTER_API_KEY')}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://brutl.app',
-        'X-Title': 'BRUTL',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'anthropic/claude-haiku-4-5',
-        max_tokens: 256,
-        messages: [{
-          role: 'user',
-          content: [
-            {
-              type: 'image_url',
-              image_url: { url: `data:image/jpeg;base64,${image}` },
-            },
-            {
-              type: 'text',
-              text: PROMPT,
-            },
+        contents: [{
+          parts: [
+            { inline_data: { mime_type: 'image/jpeg', data: image } },
+            { text: PROMPT },
           ],
         }],
+        generationConfig: { maxOutputTokens: 256, temperature: 0.1 },
       }),
     });
 
@@ -65,10 +55,9 @@ Deno.serve(async (req) => {
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content ?? '';
+    const text: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 
-    // Parse JSON from response
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       return new Response(JSON.stringify({ error: 'No JSON in response' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -76,7 +65,6 @@ Deno.serve(async (req) => {
     }
 
     const macros = JSON.parse(jsonMatch[0]);
-
     return new Response(JSON.stringify(macros), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

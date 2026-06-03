@@ -50,22 +50,30 @@ const GROUP_ORDER: MealGroupKey[] = ['MORNING', 'AFTERNOON', 'EVENING', 'LATE NI
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-async function searchOpenFoodFacts(query: string): Promise<MealEntry[]> {
-  const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&search_simple=1&action=process&json=1&page_size=10&lc=en&lang=en`;
+const GEMINI_KEY = 'REDACTED_GEMINI_KEY';
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_KEY}`;
+
+async function searchFoodWithGemini(query: string): Promise<MealEntry[]> {
   try {
-    const res = await fetch(url);
+    const prompt = `For the food query "${query}", return a JSON array of up to 8 matching foods with accurate nutritional data per 100g serving. Include common variations (raw, cooked, different preparations). For Indian dishes use standard recipes.
+
+Return ONLY a valid JSON array, no markdown, no explanation:
+[{"name":"specific food name","calories":number,"proteinG":number,"carbsG":number,"fatG":number,"servingG":100}]`;
+
+    const res = await fetch(GEMINI_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 1024, temperature: 0.1 },
+      }),
+    });
+    if (!res.ok) return [];
     const data = await res.json();
-    return (data.products ?? [])
-      .filter((p: any) => (p.product_name_en || p.product_name) && p.nutriments)
-      .slice(0, 8)
-      .map((p: any) => ({
-        name: p.product_name_en || p.product_name || 'Unknown',
-        calories: Math.round(p.nutriments['energy-kcal_100g'] ?? p.nutriments['energy-kcal'] ?? 0),
-        proteinG: parseFloat((p.nutriments['proteins_100g'] ?? 0).toFixed(1)),
-        carbsG: parseFloat((p.nutriments['carbohydrates_100g'] ?? 0).toFixed(1)),
-        fatG: parseFloat((p.nutriments['fat_100g'] ?? 0).toFixed(1)),
-        servingG: 100,
-      }));
+    const text: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    const match = text.match(/\[[\s\S]*\]/);
+    if (!match) return [];
+    return JSON.parse(match[0]) as MealEntry[];
   } catch {
     return [];
   }
@@ -221,7 +229,7 @@ export default function DietScreen() {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
-      const r = await searchOpenFoodFacts(query);
+      const r = await searchFoodWithGemini(query);
       setResults(r);
       setSearching(false);
     }, 500);
@@ -335,7 +343,7 @@ export default function DietScreen() {
               style={st.input}
               value={query}
               onChangeText={setQuery}
-              placeholder="chicken breast, oats, rice..."
+              placeholder="Search any food with AI..."
               placeholderTextColor={BrutlColors.textDisabled}
               returnKeyType="search"
             />
