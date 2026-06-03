@@ -64,19 +64,6 @@ interface UserState {
   setHasOnboarded: (value: boolean) => Promise<void>;
 }
 
-function calcMacroTargets(weightKg: number, goal: Goal): MacroTargets {
-  const protein = Math.round(weightKg * 2.2);
-  if (goal === 'FAT_LOSS') {
-    const calories = Math.round(weightKg * 26);
-    return { calories, proteinG: protein, carbsG: Math.round((calories * 0.3) / 4), fatG: Math.round((calories * 0.25) / 9) };
-  }
-  if (goal === 'MUSCLE_GAIN') {
-    const calories = Math.round(weightKg * 35);
-    return { calories, proteinG: protein, carbsG: Math.round((calories * 0.45) / 4), fatG: Math.round((calories * 0.25) / 9) };
-  }
-  const calories = Math.round(weightKg * 30);
-  return { calories, proteinG: protein, carbsG: Math.round((calories * 0.4) / 4), fatG: Math.round((calories * 0.25) / 9) };
-}
 
 export function buildUserProfile(data: {
   name: string;
