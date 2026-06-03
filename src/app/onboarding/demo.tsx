@@ -41,7 +41,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: BrutlColors.border,
   },
-  dayCol: { width: 40 },
+  dayCol: { width: 44 },
   workoutCol: { flex: 3, paddingRight: BrutlSpacing.sm },
   dietCol: { flex: 2 },
   redDot: {
@@ -95,8 +95,12 @@ export default function DemoScreen() {
           {/* Table header */}
           <View style={styles.tableHeader}>
             <View style={styles.dayCol} />
-            <BrutlText variant="caption" style={[styles.workoutCol, { color: BrutlColors.textMuted }]}>WORKOUT</BrutlText>
-            <BrutlText variant="caption" style={[styles.dietCol, { color: BrutlColors.textMuted }]}>DIET</BrutlText>
+            <View style={styles.workoutCol}>
+              <BrutlText variant="caption" style={{ color: BrutlColors.textMuted }}>WORKOUT</BrutlText>
+            </View>
+            <View style={styles.dietCol}>
+              <BrutlText variant="caption" style={{ color: BrutlColors.textMuted }}>DIET</BrutlText>
+            </View>
           </View>
 
           {FAKE_WEEK.map((row, i) => (
@@ -105,8 +109,12 @@ export default function DemoScreen() {
                 <View style={styles.redDot} />
                 <BrutlText style={styles.dayText}>{row.day}</BrutlText>
               </View>
-              <BrutlText variant="caption" style={styles.workoutCol}>{row.workout}</BrutlText>
-              <BrutlText variant="caption" style={[styles.dietCol, { color: BrutlColors.accentDim }]}>{row.diet}</BrutlText>
+              <View style={styles.workoutCol}>
+                <BrutlText variant="caption">{row.workout}</BrutlText>
+              </View>
+              <View style={styles.dietCol}>
+                <BrutlText variant="caption" style={{ color: BrutlColors.accentDim }}>{row.diet}</BrutlText>
+              </View>
             </View>
           ))}
         </BrutlCard>
