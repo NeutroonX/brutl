@@ -1,8 +1,6 @@
 import { create } from 'zustand';
 
 import { STORAGE_KEYS, storageGet, storageSet } from '@/lib/storage';
-import { useQuestStore } from '@/stores/quest.store';
-import { useDungeonStore } from '@/stores/dungeon.store';
 import { useUserStore } from '@/stores/user.store';
 import type { DietLog, MealEntry } from '@/types';
 
@@ -65,27 +63,12 @@ export const useDietStore = create<DietState>((set, get) => ({
     const target = profile.macroTargets.proteinG;
     const proteinRatio = target > 0 ? macros.totalProteinG / target : 0;
 
-    // Progress daily quest when hitting 80% protein
-    if (proteinRatio >= 0.8) {
-      await useQuestStore.getState().progressActiveQuest('DAILY', 0.5).catch(() => {});
-    }
-
-    // Dungeon protein update
-    await useDungeonStore.getState().onProteinUpdated(proteinRatio).catch(() => {});
-
     // Track protein streak (consecutive days hitting target)
-    let proteinStreak = get().proteinStreakDays;
     if (proteinRatio >= 1.0) {
       const yesterday = todayKey() - 24 * 60 * 60 * 1000;
       const hitYesterday = logs.some((l) => l.date === yesterday && l.totalProteinG >= target);
-      proteinStreak = hitYesterday ? proteinStreak + 1 : 1;
-      set({ proteinStreakDays: proteinStreak });
+      set({ proteinStreakDays: hitYesterday ? get().proteinStreakDays + 1 : 1 });
     }
-
-    // Shadow quest triggers
-    await useQuestStore.getState().checkShadowTriggers({
-      proteinStreakDays: proteinStreak,
-    }).catch(() => {});
   },
 
   removeMeal: async (mealIndex: number) => {

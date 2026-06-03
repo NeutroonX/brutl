@@ -40,7 +40,6 @@ import {
   cacheExerciseProfile,
 } from '@/lib/workout-ai';
 import { calcWorkoutXP } from '@/lib/xp';
-import { useDungeonStore } from '@/stores/dungeon.store';
 import { useRoutineStore } from '@/stores/routine.store';
 import { useUserStore } from '@/stores/user.store';
 import { useWorkoutStore } from '@/stores/workout.store';
@@ -951,7 +950,6 @@ export default function WorkoutScreen() {
   const getBaseline = useWorkoutStore((s) => s.getBaselineForExercise);
   const recentLogs = useWorkoutStore((s) => s.getRecentLogs)(30);
   const lastSession = recentLogs[0] ?? null;
-  const multiplier = useDungeonStore((s) => s.getMultiplier)();
   const { pending: xpPending, showXP, clearXP } = useXPToast();
 
   const pendingDay = useRoutineStore((s) => s.pendingDay);
@@ -1136,7 +1134,7 @@ export default function WorkoutScreen() {
 
     const durationMins = Math.max(1, Math.round(elapsedSecs / 60));
     const baseXP = calcWorkoutXP(doneSets, durationMins);
-    const xp = Math.round(baseXP * multiplier);
+    const xp = baseXP;
     await addLog(doneSets, durationMins, xp);
     await updateXP(xp);
     showXP(xp);
@@ -1172,7 +1170,7 @@ export default function WorkoutScreen() {
 
   return (
     <KeyboardAvoidingView style={st.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <XPToast amount={xpPending} onHide={clearXP} multiplier={multiplier} />
+      <XPToast amount={xpPending} onHide={clearXP} />
 
       {/* Fixed session header */}
       <View style={st.header}>
