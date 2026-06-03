@@ -97,9 +97,13 @@ async function apiFetch<T>(path: string): Promise<T | null> {
         'Content-Type': 'application/json',
       },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error(`[ExerciseDB] ${res.status} ${res.statusText} — ${path}`);
+      return null;
+    }
     return (await res.json()) as T;
-  } catch {
+  } catch (e) {
+    console.error(`[ExerciseDB] fetch error:`, e);
     return null;
   }
 }

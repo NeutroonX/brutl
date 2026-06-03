@@ -27,8 +27,6 @@ import type { MealEntry } from '@/types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const USDA_KEY = process.env.EXPO_PUBLIC_USDA_API_KEY ?? '';
-
 const MACRO_COLORS = {
   kcal:    '#E8E8E8',
   protein: BrutlColors.accent,
@@ -39,30 +37,27 @@ const MACRO_COLORS = {
 type MealGroupKey = 'MORNING' | 'AFTERNOON' | 'EVENING' | 'LATE NIGHT';
 const GROUP_ORDER: MealGroupKey[] = ['MORNING', 'AFTERNOON', 'EVENING', 'LATE NIGHT'];
 
-// ─── USDA Food Search ─────────────────────────────────────────────────────────
+// ─── Food Search (Open Food Facts — no API key required) ──────────────────────
 
-async function searchUSDA(query: string): Promise<MealEntry[]> {
-  try {
-    const url = `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(query)}&api_key=${USDA_KEY}&pageSize=12&dataType=Foundation,SR%20Legacy,Branded`;
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    const data = await res.json();
-    const getNutrient = (food: any, id: number): number =>
-      food.foodNutrients?.find((n: any) => n.nutrientId === id)?.value ?? 0;
-    return (data.foods ?? [])
-      .map((food: any): MealEntry => ({
-        name: food.description ?? 'Unknown',
-        calories: Math.round(getNutrient(food, 1008)),
-        proteinG: parseFloat(getNutrient(food, 1003).toFixed(1)),
-        carbsG: parseFloat(getNutrient(food, 1005).toFixed(1)),
-        fatG: parseFloat(getNutrient(food, 1004).toFixed(1)),
+async function searchFoods(query: string): Promise<MealEntry[]> {
+  const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(query)}&json=true&page_size=20&fields=product_name,nutriments,serving_size`;
+  const res = await fetch(url, { headers: { 'User-Agent': 'Brutl/1.0' } });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  return (data.products ?? [])
+    .map((p: any): MealEntry => {
+      const n = p.nutriments ?? {};
+      return {
+        name: p.product_name ?? 'Unknown',
+        calories: Math.round(n['energy-kcal_100g'] ?? n['energy-kcal'] ?? 0),
+        proteinG: parseFloat((n['proteins_100g'] ?? 0).toFixed(1)),
+        carbsG: parseFloat((n['carbohydrates_100g'] ?? 0).toFixed(1)),
+        fatG: parseFloat((n['fat_100g'] ?? 0).toFixed(1)),
         servingG: 100,
-      }))
-      .filter((f: MealEntry) => f.calories > 0)
-      .slice(0, 8);
-  } catch {
-    return [];
-  }
+      };
+    })
+    .filter((f: MealEntry) => f.name && f.calories > 0)
+    .slice(0, 10);
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -482,6 +477,7 @@ export default function DietScreen() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<MealEntry[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [favourites, setFavourites] = useState<MealEntry[]>([]);
   const [showBarcode, setShowBarcode] = useState(false);
   const [showPhoto, setShowPhoto] = useState(false);
@@ -498,13 +494,20 @@ export default function DietScreen() {
 
   // Search on query change
   useEffect(() => {
-    if (!query.trim() || query.length < 2) { setResults([]); return; }
+    if (!query.trim() || query.length < 2) { setResults([]); setSearchError(null); return; }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
-      const r = await searchUSDA(query);
-      setResults(r);
-      setSearching(false);
+      setSearchError(null);
+      try {
+        const r = await searchFoods(query);
+        setResults(r);
+      } catch (e: any) {
+        setResults([]);
+        setSearchError('Search failed. Check your connection.');
+      } finally {
+        setSearching(false);
+      }
     }, 400);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [query]);
@@ -704,7 +707,9 @@ export default function DietScreen() {
           )}
 
           {showSearch && !searching && query.trim().length >= 2 && results.length === 0 && (
-            <BrutlText style={st.noResults}>No results. Try a different name or scan the barcode.</BrutlText>
+            <BrutlText style={st.noResults}>
+              {searchError ?? 'No results. Try a different name or scan the barcode.'}
+            </BrutlText>
           )}
         </View>
 

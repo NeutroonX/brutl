@@ -748,6 +748,7 @@ function InfoSheet({
   const muscles = getTopMuscles(exercise, 4);
   const [dbEntry, setDbEntry] = useState<ExerciseDBEntry | null>(() => getExerciseFromCache(exercise));
   const [dbLoading, setDbLoading] = useState(false);
+  const [dbError, setDbError] = useState<string | null>(null);
 
   useEffect(() => {
     Animated.spring(slideY, { toValue: 0, useNativeDriver: true, tension: 80, friction: 12 }).start();
@@ -755,8 +756,13 @@ function InfoSheet({
 
   async function loadFromDB() {
     setDbLoading(true);
+    setDbError(null);
     const entry = await getExerciseByName(exercise);
-    setDbEntry(entry);
+    if (entry) {
+      setDbEntry(entry);
+    } else {
+      setDbError('Not found in database. Check Metro logs for API error details.');
+    }
     setDbLoading(false);
   }
 
@@ -820,15 +826,22 @@ function InfoSheet({
                 ))}
               </>
             ) : (
-              <TouchableOpacity
-                style={[st.sheetClose, { marginBottom: BrutlSpacing.md, borderColor: BrutlColors.accent }]}
-                onPress={loadFromDB}
-                disabled={dbLoading}
-              >
-                <BrutlText style={{ fontSize: 12, color: BrutlColors.accent, fontFamily: BrutlFonts.display, letterSpacing: 1 }}>
-                  {dbLoading ? 'LOADING…' : 'LOAD FROM DATABASE (1 REQUEST)'}
-                </BrutlText>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity
+                  style={[st.sheetClose, { marginBottom: BrutlSpacing.sm, borderColor: BrutlColors.accent }]}
+                  onPress={loadFromDB}
+                  disabled={dbLoading}
+                >
+                  <BrutlText style={{ fontSize: 12, color: BrutlColors.accent, fontFamily: BrutlFonts.display, letterSpacing: 1 }}>
+                    {dbLoading ? 'LOADING…' : 'LOAD FROM DATABASE (1 REQUEST)'}
+                  </BrutlText>
+                </TouchableOpacity>
+                {dbError && (
+                  <BrutlText style={{ fontSize: 11, color: BrutlColors.error ?? '#FF4444', marginBottom: BrutlSpacing.md, textAlign: 'center' }}>
+                    {dbError}
+                  </BrutlText>
+                )}
+              </>
             )}
 
             {/* ── AI section ─────────────────────────────────────── */}
