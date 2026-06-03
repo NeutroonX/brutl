@@ -31,4 +31,5 @@ export const STORAGE_KEYS = {
   shadows: 'brutl:shadows',
   routines: 'brutl:routines',
   exerciseApiUsage: 'brutl:exercise_api_usage',
+  dietFavourites: 'brutl:diet_favourites',
 } as const;

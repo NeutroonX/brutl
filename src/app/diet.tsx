@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -18,6 +18,7 @@ import { PhotoScanModal } from '@/components/PhotoScanModal';
 import { ScanConfirmSheet } from '@/components/ScanConfirmSheet';
 import { BrutlColors, BrutlFonts, BrutlRadius, BrutlSpacing } from '@/constants/theme';
 import { buildRoastPayload, streamRoast } from '@/lib/roast-engine';
+import { STORAGE_KEYS, storageGet, storageSet } from '@/lib/storage';
 import { calcMacroCompliance } from '@/lib/xp';
 import { useDietStore } from '@/stores/diet.store';
 import { useUserStore } from '@/stores/user.store';
@@ -25,59 +26,45 @@ import type { MealEntry } from '@/types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const RING_SIZE = 70;
-const RING_STROKE = 5;
-const RING_HALF = RING_SIZE / 2;
+const USDA_KEY = 'LkQgJO8KFYQIlOgL9RQLK6IfhhAJ0t4JiJKxy9HY';
 
 const MACRO_COLORS = {
-  kcal:    BrutlColors.textPrimary,
+  kcal:    '#E8E8E8',
   protein: BrutlColors.accent,
   carbs:   '#E2C44A',
   fat:     '#888888',
 } as const;
 
-const DEFAULT_QUICK_FOODS: MealEntry[] = [
-  { name: 'Oats',           calories: 68,  proteinG: 2.4,  carbsG: 12.0, fatG: 1.4, servingG: 100 },
-  { name: 'Eggs (2 whole)', calories: 140, proteinG: 12.0, carbsG: 0.8,  fatG: 9.8, servingG: 100 },
-  { name: 'Rajma',          calories: 127, proteinG: 8.7,  carbsG: 22.8, fatG: 0.5, servingG: 100 },
-  { name: 'Chana Dal',      calories: 164, proteinG: 8.9,  carbsG: 27.0, fatG: 2.6, servingG: 100 },
-  { name: 'Brown Rice',     calories: 130, proteinG: 2.7,  carbsG: 27.5, fatG: 1.0, servingG: 100 },
-  { name: 'Protein Powder', calories: 120, proteinG: 24.0, carbsG: 3.0,  fatG: 1.5, servingG: 30  },
-];
-
 type MealGroupKey = 'MORNING' | 'AFTERNOON' | 'EVENING' | 'LATE NIGHT';
 const GROUP_ORDER: MealGroupKey[] = ['MORNING', 'AFTERNOON', 'EVENING', 'LATE NIGHT'];
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── USDA Food Search ─────────────────────────────────────────────────────────
 
-const GEMINI_KEY = 'REDACTED_GEMINI_KEY';
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_KEY}`;
-
-async function searchFoodWithGemini(query: string): Promise<MealEntry[]> {
+async function searchUSDA(query: string): Promise<MealEntry[]> {
   try {
-    const prompt = `For the food query "${query}", return a JSON array of up to 8 matching foods with accurate nutritional data per 100g serving. Include common variations (raw, cooked, different preparations). For Indian dishes use standard recipes.
-
-Return ONLY a valid JSON array, no markdown, no explanation:
-[{"name":"specific food name","calories":number,"proteinG":number,"carbsG":number,"fatG":number,"servingG":100}]`;
-
-    const res = await fetch(GEMINI_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 1024, temperature: 0.1 },
-      }),
-    });
+    const url = `https://api.nal.usda.gov/fdc/v1/foods/search?query=${encodeURIComponent(query)}&api_key=${USDA_KEY}&pageSize=12&dataType=Foundation,SR%20Legacy,Branded`;
+    const res = await fetch(url);
     if (!res.ok) return [];
     const data = await res.json();
-    const text: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-    const match = text.match(/\[[\s\S]*\]/);
-    if (!match) return [];
-    return JSON.parse(match[0]) as MealEntry[];
+    const getNutrient = (food: any, id: number): number =>
+      food.foodNutrients?.find((n: any) => n.nutrientId === id)?.value ?? 0;
+    return (data.foods ?? [])
+      .map((food: any): MealEntry => ({
+        name: food.description ?? 'Unknown',
+        calories: Math.round(getNutrient(food, 1008)),
+        proteinG: parseFloat(getNutrient(food, 1003).toFixed(1)),
+        carbsG: parseFloat(getNutrient(food, 1005).toFixed(1)),
+        fatG: parseFloat(getNutrient(food, 1004).toFixed(1)),
+        servingG: 100,
+      }))
+      .filter((f: MealEntry) => f.calories > 0)
+      .slice(0, 8);
   } catch {
     return [];
   }
 }
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function getMealGroup(loggedAt?: number): MealGroupKey {
   if (!loggedAt) return 'MORNING';
@@ -100,96 +87,103 @@ function getFrequentFoods(logs: ReturnType<typeof useDietStore.getState>['logs']
   return [...freq.values()].sort((a, b) => b.count - a.count).slice(0, 6).map((v) => v.food);
 }
 
-// ─── Progress Ring ────────────────────────────────────────────────────────────
+function isFavourited(favs: MealEntry[], food: MealEntry) {
+  return favs.some((f) => f.name.toLowerCase() === food.name.toLowerCase());
+}
 
-function ProgressRing({
-  value, target, unit, label, color,
-}: {
-  value: number; target: number; unit: string; label: string; color: string;
+// ─── MacroChip (Option E) ─────────────────────────────────────────────────────
+
+function MacroChip({ label, value, target, unit, color }: {
+  label: string; value: number; target: number; unit: string; color: string;
 }) {
-  const pct = Math.min(1, Math.max(0, target > 0 ? value / target : 0));
-  const angle = pct * 360;
-  const overTarget = pct >= 1;
-  const ringColor = overTarget ? BrutlColors.success : color;
-
-  const rightDeg = Math.min(angle, 180) - 180;
-  const leftDeg = Math.max(angle - 180, 0) - 180;
-  const leftVisible = angle > 180;
+  const pct = target > 0 ? Math.min(1, value / target) : 0;
+  const over = pct >= 1;
+  const activeColor = over ? BrutlColors.success : color;
+  const pctInt = Math.round(pct * 100);
 
   return (
-    <View style={rs.col}>
-      <View style={{ width: RING_SIZE, height: RING_SIZE }}>
-        {/* Track */}
-        <View style={[rs.circle, { borderColor: BrutlColors.border }]} />
-
-        {/* Right half */}
-        <View style={rs.clipRight}>
-          <View style={[rs.circle, {
-            position: 'absolute', left: -RING_HALF,
-            borderColor: ringColor,
-            transform: [{ rotate: `${rightDeg}deg` }],
-          }]} />
-        </View>
-
-        {/* Left half */}
-        <View style={rs.clipLeft}>
-          <View style={[rs.circle, {
-            position: 'absolute', left: 0,
-            borderColor: leftVisible ? ringColor : 'transparent',
-            transform: [{ rotate: `${leftDeg}deg` }],
-          }]} />
-        </View>
-
-        {/* Center */}
-        <View style={rs.center}>
-          <BrutlText style={[rs.val, { color: overTarget ? BrutlColors.success : BrutlColors.textPrimary }]}>
-            {Math.round(value)}
-          </BrutlText>
-          <BrutlText style={rs.tgt}>/{target}{unit}</BrutlText>
-        </View>
+    <View style={mc.chip}>
+      <BrutlText style={[mc.value, { color: value > 0 ? (over ? BrutlColors.success : BrutlColors.textPrimary) : BrutlColors.textDisabled }]}>
+        {Math.round(value)}
+      </BrutlText>
+      <BrutlText style={mc.unit}>{unit}</BrutlText>
+      <BrutlText style={[mc.pct, { color: pct > 0 ? activeColor : BrutlColors.textDisabled }]}>
+        {target > 0 ? `${pctInt}%` : '—'}
+      </BrutlText>
+      <View style={mc.barTrack}>
+        <View style={[mc.barFill, {
+          width: `${Math.min(100, pctInt)}%` as any,
+          backgroundColor: activeColor,
+        }]} />
       </View>
-
-      <BrutlText style={[rs.lbl, {
-        color: pct > 0 ? (overTarget ? BrutlColors.success : color) : BrutlColors.textDisabled,
-      }]}>
+      <BrutlText style={[mc.label, { color: pct > 0 ? activeColor : BrutlColors.textDisabled }]}>
         {label}
       </BrutlText>
     </View>
   );
 }
 
-const rs = StyleSheet.create({
-  col: { flex: 1, alignItems: 'center', gap: 7 },
-  circle: {
+const mc = StyleSheet.create({
+  chip: {
+    flex: 1,
+    backgroundColor: BrutlColors.bgCard,
+    borderRadius: BrutlRadius.sm,
+    borderWidth: 1,
+    borderColor: BrutlColors.borderVisible,
+    paddingHorizontal: 8,
+    paddingTop: 10,
+    paddingBottom: 18,
+    gap: 2,
+    overflow: 'hidden',
+  },
+  value: {
+    fontFamily: 'BebasNeue_400Regular',
+    fontSize: 26,
+    lineHeight: 28,
+    letterSpacing: 0.5,
+  },
+  unit: {
+    fontSize: 9,
+    color: BrutlColors.textMuted,
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  pct: {
+    fontFamily: 'BebasNeue_400Regular',
+    fontSize: 13,
+    letterSpacing: 0.5,
+  },
+  barTrack: {
     position: 'absolute',
-    width: RING_SIZE, height: RING_SIZE,
-    borderRadius: RING_HALF, borderWidth: RING_STROKE,
+    bottom: 0, left: 0, right: 0,
+    height: 4,
+    backgroundColor: '#1A1A1A',
   },
-  clipRight: {
-    position: 'absolute', left: RING_HALF,
-    width: RING_HALF, height: RING_SIZE, overflow: 'hidden',
+  barFill: {
+    height: 4,
   },
-  clipLeft: {
-    position: 'absolute', left: 0,
-    width: RING_HALF, height: RING_SIZE, overflow: 'hidden',
+  label: {
+    fontSize: 8,
+    letterSpacing: 1.2,
+    marginTop: 1,
   },
-  center: {
-    position: 'absolute',
-    top: RING_STROKE + 2, left: RING_STROKE + 2,
-    right: RING_STROKE + 2, bottom: RING_STROKE + 2,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  val: { fontFamily: 'BebasNeue_400Regular', fontSize: 16, lineHeight: 18 },
-  tgt: { fontSize: 8, color: BrutlColors.textMuted, lineHeight: 10 },
-  lbl: { fontSize: 9, letterSpacing: 1.2 },
 });
 
 // ─── Quick Add Tile ───────────────────────────────────────────────────────────
 
-function QuickTile({ food, onPress }: { food: MealEntry; onPress: () => void }) {
+function QuickTile({
+  food, onPress, onStar, starred,
+}: {
+  food: MealEntry; onPress: () => void; onStar: () => void; starred: boolean;
+}) {
   return (
     <TouchableOpacity style={qt.tile} onPress={onPress} activeOpacity={0.7}>
-      <BrutlText style={qt.name} numberOfLines={1}>{food.name}</BrutlText>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <BrutlText style={qt.name} numberOfLines={1}>{food.name}</BrutlText>
+        <TouchableOpacity onPress={onStar} hitSlop={8}>
+          <Ionicons name={starred ? 'star' : 'star-outline'} size={12} color={starred ? '#F5C518' : BrutlColors.textDisabled} />
+        </TouchableOpacity>
+      </View>
       <BrutlText style={qt.macros}>{food.proteinG}g P · {food.calories} kcal</BrutlText>
     </TouchableOpacity>
   );
@@ -204,9 +198,9 @@ const qt = StyleSheet.create({
     borderColor: BrutlColors.borderVisible,
     paddingHorizontal: BrutlSpacing.sm,
     paddingVertical: 10,
-    gap: 3,
+    gap: 4,
   },
-  name: { fontSize: 12, color: BrutlColors.textPrimary, fontFamily: BrutlFonts.body },
+  name: { flex: 1, fontSize: 11, color: BrutlColors.textPrimary, fontFamily: BrutlFonts.body },
   macros: { fontSize: 10, color: BrutlColors.textMuted },
 });
 
@@ -219,22 +213,42 @@ export default function DietScreen() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<MealEntry[]>([]);
   const [searching, setSearching] = useState(false);
+  const [favourites, setFavourites] = useState<MealEntry[]>([]);
   const [showBarcode, setShowBarcode] = useState(false);
   const [showPhoto, setShowPhoto] = useState(false);
   const [pendingScan, setPendingScan] = useState<ScannedFood | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Load favourites from storage
+  useEffect(() => {
+    storageGet<MealEntry[]>(STORAGE_KEYS.dietFavourites).then((f) => {
+      if (f) setFavourites(f);
+    });
+  }, []);
+
+  // Search on query change
   useEffect(() => {
     if (!query.trim() || query.length < 2) { setResults([]); return; }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
-      const r = await searchFoodWithGemini(query);
+      const r = await searchUSDA(query);
       setResults(r);
       setSearching(false);
-    }, 500);
+    }, 400);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [query]);
+
+  const toggleFavourite = useCallback(async (food: MealEntry) => {
+    setFavourites((prev) => {
+      const exists = isFavourited(prev, food);
+      const next = exists
+        ? prev.filter((f) => f.name.toLowerCase() !== food.name.toLowerCase())
+        : [{ ...food, loggedAt: undefined }, ...prev];
+      storageSet(STORAGE_KEYS.dietFavourites, next);
+      return next;
+    });
+  }, []);
 
   function handleScannedFood(food: ScannedFood) {
     setShowBarcode(false);
@@ -263,6 +277,7 @@ export default function DietScreen() {
   const targets = profile?.macroTargets;
   const meals = todayLog?.meals ?? [];
   const hasMeals = meals.length > 0;
+  const showSearch = query.trim().length > 0;
 
   const mealGroups = meals.reduce<Record<MealGroupKey, { meal: MealEntry; index: number }[]>>(
     (acc, meal, index) => {
@@ -274,8 +289,32 @@ export default function DietScreen() {
   );
 
   const frequent = getFrequentFoods(logs);
-  const quickFoods = frequent.length >= 4 ? frequent.slice(0, 6) : DEFAULT_QUICK_FOODS;
-  const showQuick = !query.trim();
+  const hasFavourites = favourites.length > 0;
+  const hasFrequent = frequent.length > 0;
+
+  function renderTileGrid(foods: MealEntry[]) {
+    const rows = [];
+    for (let row = 0; row < Math.ceil(foods.length / 3); row++) {
+      rows.push(
+        <View key={row} style={st.tilesRow}>
+          {foods.slice(row * 3, row * 3 + 3).map((food, idx) => (
+            <QuickTile
+              key={idx}
+              food={food}
+              starred={isFavourited(favourites, food)}
+              onPress={() => setPendingScan(food)}
+              onStar={() => toggleFavourite(food)}
+            />
+          ))}
+          {foods.slice(row * 3, row * 3 + 3).length < 3 &&
+            Array.from({ length: 3 - foods.slice(row * 3, row * 3 + 3).length }).map((_, i) => (
+              <View key={`empty-${i}`} style={{ flex: 1 }} />
+            ))}
+        </View>
+      );
+    }
+    return rows;
+  }
 
   return (
     <KeyboardAvoidingView style={st.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -302,48 +341,25 @@ export default function DietScreen() {
           </View>
         </View>
 
-        {/* Macro Rings */}
+        {/* Macro Chips — Option E */}
         {targets && (
-          <BrutlCard>
-            <View style={st.ringsRow}>
-              <ProgressRing
-                value={todayLog?.totalCalories ?? 0}
-                target={targets.calories}
-                unit="" label="KCAL"
-                color={MACRO_COLORS.kcal}
-              />
-              <ProgressRing
-                value={Math.round(todayLog?.totalProteinG ?? 0)}
-                target={targets.proteinG}
-                unit="g" label="PROTEIN"
-                color={MACRO_COLORS.protein}
-              />
-              <ProgressRing
-                value={Math.round(todayLog?.totalCarbsG ?? 0)}
-                target={targets.carbsG}
-                unit="g" label="CARBS"
-                color={MACRO_COLORS.carbs}
-              />
-              <ProgressRing
-                value={Math.round(todayLog?.totalFatG ?? 0)}
-                target={targets.fatG}
-                unit="g" label="FAT"
-                color={MACRO_COLORS.fat}
-              />
-            </View>
-          </BrutlCard>
+          <View style={st.chipsRow}>
+            <MacroChip value={todayLog?.totalCalories ?? 0} target={targets.calories} unit="KCAL" label="CALORIES" color={MACRO_COLORS.kcal} />
+            <MacroChip value={Math.round(todayLog?.totalProteinG ?? 0)} target={targets.proteinG} unit="G" label="PROTEIN" color={MACRO_COLORS.protein} />
+            <MacroChip value={Math.round(todayLog?.totalCarbsG ?? 0)} target={targets.carbsG} unit="G" label="CARBS" color={MACRO_COLORS.carbs} />
+            <MacroChip value={Math.round(todayLog?.totalFatG ?? 0)} target={targets.fatG} unit="G" label="FAT" color={MACRO_COLORS.fat} />
+          </View>
         )}
 
         {/* Search */}
         <View style={st.section}>
           <BrutlText style={st.sectionLabel}>SEARCH FOOD</BrutlText>
-
           <View style={st.searchRow}>
             <TextInput
               style={st.input}
               value={query}
               onChangeText={setQuery}
-              placeholder="Search any food with AI..."
+              placeholder="chicken, oats, dosa..."
               placeholderTextColor={BrutlColors.textDisabled}
               returnKeyType="search"
             />
@@ -353,47 +369,62 @@ export default function DietScreen() {
             }
           </View>
 
-          {/* Quick add tiles — 3 per row, 2 rows */}
-          {showQuick && (
-            <View style={st.tilesOuter}>
-              {[0, 1].map((row) => (
-                <View key={row} style={st.tilesRow}>
-                  {quickFoods.slice(row * 3, row * 3 + 3).map((food, idx) => (
-                    <QuickTile key={idx} food={food} onPress={() => setPendingScan(food)} />
-                  ))}
-                </View>
-              ))}
+          {/* Favourites section */}
+          {!showSearch && hasFavourites && (
+            <View style={st.tilesSection}>
+              <View style={st.tilesSectionHeader}>
+                <Ionicons name="star" size={10} color="#F5C518" />
+                <BrutlText style={st.tilesSectionLabel}>FAVOURITES</BrutlText>
+              </View>
+              <View style={st.tilesOuter}>{renderTileGrid(favourites.slice(0, 6))}</View>
             </View>
           )}
 
+          {/* Frequent section (only if no favourites) */}
+          {!showSearch && !hasFavourites && hasFrequent && (
+            <View style={st.tilesSection}>
+              <BrutlText style={st.tilesSectionLabel}>FREQUENT</BrutlText>
+              <View style={st.tilesOuter}>{renderTileGrid(frequent)}</View>
+            </View>
+          )}
+
+          {/* No quick foods hint */}
+          {!showSearch && !hasFavourites && !hasFrequent && (
+            <BrutlText style={st.noResults}>Star foods below to pin them here.</BrutlText>
+          )}
+
           {/* Search results */}
-          {!showQuick && results.length > 0 && (
+          {showSearch && results.length > 0 && (
             <BrutlCard>
               {results.map((r, idx) => (
                 <View key={idx}>
-                  <TouchableOpacity style={st.resultRow} onPress={() => handleAdd(r)}>
-                    <View style={{ flex: 1, gap: 2 }}>
+                  <View style={st.resultRow}>
+                    <TouchableOpacity style={{ flex: 1 }} onPress={() => handleAdd(r)}>
                       <BrutlText style={st.resultName} numberOfLines={1}>{r.name}</BrutlText>
                       <BrutlText style={st.resultMacros}>
                         {r.calories} kcal · P {r.proteinG}g · C {r.carbsG}g · F {r.fatG}g
                       </BrutlText>
-                    </View>
-                    <View style={st.addChip}>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => toggleFavourite(r)} hitSlop={8} style={st.starBtn}>
+                      <Ionicons
+                        name={isFavourited(favourites, r) ? 'star' : 'star-outline'}
+                        size={16}
+                        color={isFavourited(favourites, r) ? '#F5C518' : BrutlColors.textDisabled}
+                      />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={st.addChip} onPress={() => handleAdd(r)}>
                       <Ionicons name="add" size={14} color={BrutlColors.accent} />
                       <BrutlText style={st.addChipText}>ADD</BrutlText>
-                    </View>
-                  </TouchableOpacity>
+                    </TouchableOpacity>
+                  </View>
                   {idx < results.length - 1 && <View style={st.divider} />}
                 </View>
               ))}
             </BrutlCard>
           )}
 
-          {/* No results */}
-          {!showQuick && !searching && query.trim().length >= 2 && results.length === 0 && (
-            <BrutlText style={st.noResults}>
-              No results. Try a different name or scan the barcode.
-            </BrutlText>
+          {showSearch && !searching && query.trim().length >= 2 && results.length === 0 && (
+            <BrutlText style={st.noResults}>No results. Try a different name or scan the barcode.</BrutlText>
           )}
         </View>
 
@@ -403,9 +434,6 @@ export default function DietScreen() {
             <BrutlText style={st.emptyText}>
               0 meals logged. The day is already wasted if you haven't eaten by now.
             </BrutlText>
-            <TouchableOpacity style={st.emptyCta}>
-              <BrutlText style={st.emptyCtaText}>Log first meal →</BrutlText>
-            </TouchableOpacity>
           </BrutlCard>
         )}
 
@@ -426,6 +454,13 @@ export default function DietScreen() {
                             {meal.calories} kcal · P {meal.proteinG}g · C {meal.carbsG}g · F {meal.fatG}g
                           </BrutlText>
                         </View>
+                        <TouchableOpacity onPress={() => toggleFavourite(meal)} hitSlop={8} style={st.starBtn}>
+                          <Ionicons
+                            name={isFavourited(favourites, meal) ? 'star' : 'star-outline'}
+                            size={15}
+                            color={isFavourited(favourites, meal) ? '#F5C518' : BrutlColors.textDisabled}
+                          />
+                        </TouchableOpacity>
                         <TouchableOpacity onPress={() => removeMeal(index)} hitSlop={10} style={st.deleteBtn}>
                           <Ionicons name="close-circle-outline" size={18} color={BrutlColors.textDisabled} />
                         </TouchableOpacity>
@@ -462,7 +497,7 @@ const st = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
-  ringsRow: { flexDirection: 'row', gap: BrutlSpacing.xs },
+  chipsRow: { flexDirection: 'row', gap: BrutlSpacing.xs },
 
   section: { gap: BrutlSpacing.sm },
   sectionLabel: { fontSize: 11, color: BrutlColors.accent, letterSpacing: 1.5 },
@@ -481,6 +516,9 @@ const st = StyleSheet.create({
     paddingVertical: BrutlSpacing.sm + 2,
   },
 
+  tilesSection: { gap: 6 },
+  tilesSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  tilesSectionLabel: { fontSize: 10, color: BrutlColors.textDisabled, letterSpacing: 1.2 },
   tilesOuter: { gap: BrutlSpacing.sm },
   tilesRow: { flexDirection: 'row', gap: BrutlSpacing.sm },
 
@@ -488,8 +526,9 @@ const st = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center',
     paddingVertical: BrutlSpacing.sm, gap: BrutlSpacing.sm,
   },
-  resultName: { fontSize: 14, color: BrutlColors.textPrimary, fontFamily: BrutlFonts.body },
-  resultMacros: { fontSize: 11, color: BrutlColors.textMuted },
+  resultName: { fontSize: 13, color: BrutlColors.textPrimary, fontFamily: BrutlFonts.body },
+  resultMacros: { fontSize: 10, color: BrutlColors.textMuted },
+  starBtn: { padding: 4 },
   addChip: {
     flexDirection: 'row', alignItems: 'center', gap: 2,
     paddingHorizontal: 8, paddingVertical: 4,
@@ -505,15 +544,8 @@ const st = StyleSheet.create({
   },
 
   emptyText: {
-    fontSize: 14, color: BrutlColors.textMuted,
-    lineHeight: 21, marginBottom: BrutlSpacing.md,
+    fontSize: 14, color: BrutlColors.textMuted, lineHeight: 21,
   },
-  emptyCta: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: BrutlSpacing.md, paddingVertical: BrutlSpacing.sm,
-    borderWidth: 1, borderColor: BrutlColors.accent, borderRadius: BrutlRadius.sm,
-  },
-  emptyCtaText: { fontSize: 13, color: BrutlColors.accent },
 
   mealGroup: { gap: BrutlSpacing.xs },
   groupLabel: {
