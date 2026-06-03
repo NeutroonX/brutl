@@ -22,6 +22,7 @@ export interface UserProfile {
   streakDays: number;
   lastActiveDate: number | null;
   macroTargets: MacroTargets;
+  goalWeightKg?: number;
   createdAt: number;
 }
 
