@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { BrutlButton } from '@/components/ui/BrutlButton';
@@ -86,6 +87,8 @@ export default function MacroReviewScreen() {
 
   if (!profile) return null;
 
+  const insets = useSafeAreaInsets();
+
   const calculated = calcMacroTargets(
     profile.weightKg, profile.heightCm, profile.age,
     profile.gender, profile.activityLevel, profile.goal,
@@ -112,7 +115,7 @@ export default function MacroReviewScreen() {
 
   return (
     <KeyboardAvoidingView style={st.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={st.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[st.content, { paddingTop: insets.top + BrutlSpacing.xl }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={st.heading}>
           <BrutlText style={st.title}>Your Targets.</BrutlText>
           <BrutlText variant="muted">Calculated from your stats. Tap any value to adjust.</BrutlText>
@@ -176,7 +179,7 @@ export default function MacroReviewScreen() {
 
 const st = StyleSheet.create({
   container: { flex: 1, backgroundColor: BrutlColors.bg },
-  content: { padding: BrutlSpacing.xl, gap: BrutlSpacing.lg, paddingBottom: 120 },
+  content: { gap: BrutlSpacing.lg, paddingHorizontal: BrutlSpacing.xl, paddingBottom: 120 },
   heading: { gap: BrutlSpacing.xs },
   title: { fontFamily: 'BebasNeue_400Regular', fontSize: 32, color: BrutlColors.textPrimary, letterSpacing: 1 },
 
