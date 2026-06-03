@@ -127,7 +127,9 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
   const [weightKg, setWeightKg] = useState(String(profile?.weightKg ?? ''));
   const [heightCm, setHeightCm] = useState(String(profile?.heightCm ?? ''));
   const [goal, setGoal] = useState<Goal>(profile?.goal ?? 'FAT_LOSS');
-  const [weakArea, setWeakArea] = useState<WeakArea>(profile?.weakArea ?? 'DIET');
+  const [weakAreas, setWeakAreas] = useState<WeakArea[]>(
+    Array.isArray(profile?.weakArea) ? profile.weakArea : profile?.weakArea ? [profile.weakArea as WeakArea] : ['DIET']
+  );
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
@@ -137,7 +139,7 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
     const newHeightCm = parseInt(heightCm) || profile.heightCm;
     // Recalculate macro targets if weight or goal changed
     const macroTargets = (newWeightKg !== profile.weightKg || goal !== profile.goal)
-      ? buildUserProfile({ name: name.trim(), age: profile.age, weightKg: newWeightKg, heightCm: newHeightCm, goal, weakArea }).macroTargets
+      ? buildUserProfile({ name: name.trim(), age: profile.age, weightKg: newWeightKg, heightCm: newHeightCm, goal, weakArea: weakAreas }).macroTargets
       : profile.macroTargets;
     await setProfile({
       ...profile,
@@ -145,7 +147,7 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
       weightKg: newWeightKg,
       heightCm: newHeightCm,
       goal,
-      weakArea,
+      weakArea: weakAreas,
       macroTargets,
     });
     setSaving(false);
@@ -194,7 +196,11 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
             <BrutlText style={styles.fieldLabel}>WEAKEST AREA</BrutlText>
             <View style={styles.optionRow}>
               {WEAK_AREAS.map((w) => (
-                <TouchableOpacity key={w.value} style={[styles.option, weakArea === w.value && styles.optionSelected]} onPress={() => setWeakArea(w.value)}>
+                <TouchableOpacity
+                  key={w.value}
+                  style={[styles.option, weakAreas.includes(w.value) && styles.optionSelected]}
+                  onPress={() => setWeakAreas((prev) => prev.includes(w.value) ? prev.filter((x) => x !== w.value) : [...prev, w.value])}
+                >
                   <BrutlText variant="caption">{w.label}</BrutlText>
                 </TouchableOpacity>
               ))}
@@ -278,7 +284,7 @@ export default function SettingsScreen() {
             <View style={styles.divider} />
             <SettingsRow icon="flag-outline" label="Goal" sublabel={profile.goal.replace('_', ' ')} />
             <View style={styles.divider} />
-            <SettingsRow icon="barbell-outline" label="Weak Area" sublabel={profile.weakArea} />
+            <SettingsRow icon="barbell-outline" label="Weak Area" sublabel={(Array.isArray(profile.weakArea) ? profile.weakArea : [profile.weakArea]).map((w) => w.replace(/_/g, ' ')).join(', ')} />
           </BrutlCard>
         )}
 

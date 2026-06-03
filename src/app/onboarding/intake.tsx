@@ -82,7 +82,7 @@ export default function IntakeScreen() {
   const setProfile = useUserStore((s) => s.setProfile);
   const [form, setForm] = useState({ name: '', age: '', weightKg: '', heightCm: '' });
   const [goal, setGoal] = useState<Goal | null>(null);
-  const [weakArea, setWeakArea] = useState<WeakArea | null>(null);
+  const [weakAreas, setWeakAreas] = useState<WeakArea[]>([]);
   const [reactions, setReactions] = useState<Record<string, string>>({});
 
   function handleBlur(field: string) {
@@ -92,8 +92,15 @@ export default function IntakeScreen() {
     }
   }
 
+  function toggleWeakArea(w: WeakArea) {
+    setWeakAreas((prev) =>
+      prev.includes(w) ? prev.filter((x) => x !== w) : [...prev, w]
+    );
+    setReactions((r) => ({ ...r, weakArea: REACTIONS.weakArea }));
+  }
+
   function isValid() {
-    return form.name && form.age && form.weightKg && form.heightCm && goal && weakArea;
+    return form.name && form.age && form.weightKg && form.heightCm && goal && weakAreas.length > 0;
   }
 
   async function handleContinue() {
@@ -104,7 +111,7 @@ export default function IntakeScreen() {
       weightKg: parseFloat(form.weightKg),
       heightCm: parseInt(form.heightCm),
       goal: goal!,
-      weakArea: weakArea!,
+      weakArea: weakAreas,
     });
     await setProfile(profile);
     router.push('/onboarding/first-roast');
@@ -158,8 +165,8 @@ export default function IntakeScreen() {
             {WEAK_AREAS.map((w) => (
               <TouchableOpacity
                 key={w.value}
-                style={[styles.option, weakArea === w.value && styles.optionSelected]}
-                onPress={() => { setWeakArea(w.value); setReactions((r) => ({ ...r, weakArea: REACTIONS.weakArea })); }}
+                style={[styles.option, weakAreas.includes(w.value) && styles.optionSelected]}
+                onPress={() => toggleWeakArea(w.value)}
               >
                 <BrutlText variant="body">{w.label}</BrutlText>
               </TouchableOpacity>

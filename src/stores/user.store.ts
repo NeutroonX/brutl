@@ -39,7 +39,7 @@ export function buildUserProfile(data: {
   weightKg: number;
   heightCm: number;
   goal: Goal;
-  weakArea: WeakArea;
+  weakArea: WeakArea[];
 }): UserProfile {
   return {
     id: Date.now().toString(),

@@ -186,7 +186,7 @@ export default function StatsScreen() {
             { label: 'Current Streak',  value: `${profile.streakDays} days` },
             { label: 'Rank',            value: `${profile.rank} — ${RANK_TITLES[profile.rank]}` },
             { label: 'Goal',            value: profile.goal.replace('_', ' ') },
-            { label: 'Weak Area',       value: profile.weakArea.replace('_', ' ') },
+            { label: 'Weak Area',       value: (Array.isArray(profile.weakArea) ? profile.weakArea : [profile.weakArea]).map((w) => w.replace(/_/g, ' ')).join(', ') },
           ].map((s) => (
             <View key={s.label} style={styles.statRow}>
               <BrutlText variant="muted">{s.label}</BrutlText>

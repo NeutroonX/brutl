@@ -12,7 +12,7 @@ export interface UserProfile {
   weightKg: number;
   heightCm: number;
   goal: Goal;
-  weakArea: WeakArea;
+  weakArea: WeakArea[];
   rank: Rank;
   xp: number;
   streakDays: number;
