@@ -30,4 +30,5 @@ export const STORAGE_KEYS = {
   dungeon: 'brutl:dungeon',
   shadows: 'brutl:shadows',
   routines: 'brutl:routines',
+  exerciseApiUsage: 'brutl:exercise_api_usage',
 } as const;

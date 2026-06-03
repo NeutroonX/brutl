@@ -3,6 +3,7 @@ import {
   Alert,
   Animated,
   Dimensions,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -15,6 +16,14 @@ import {
 } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
+import {
+  searchExerciseDB,
+  getExerciseByName,
+  getExerciseFromCache,
+  searchFromCache,
+  getRemainingRequests,
+  type ExerciseDBEntry,
+} from '@/lib/exercise-db-api';
 import { BrutlButton } from '@/components/ui/BrutlButton';
 import { BrutlText } from '@/components/ui/BrutlText';
 import { XPToast, useXPToast } from '@/components/ui/XPToast';
@@ -45,6 +54,12 @@ const SCREEN_H = Dimensions.get('window').height;
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
+function difficultyColor(d: string) {
+  if (d === 'beginner') return BrutlColors.success;
+  if (d === 'intermediate') return BrutlColors.warning;
+  return BrutlColors.accent;
+}
+
 function ExercisePicker({
   currentNames,
   onSelect,
@@ -55,22 +70,29 @@ function ExercisePicker({
   onClose: () => void;
 }) {
   const [query, setQuery] = useState('');
-  const [aiResult, setAiResult] = useState<{ name: string; category: string } | null>(null);
+  const [aiResult, setAiResult] = useState<{ name: string } | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [dbResults, setDbResults] = useState<ExerciseDBEntry[]>([]);
+  const [dbSearching, setDbSearching] = useState(false);
+  const [dailyLeft, setDailyLeft] = useState<number | null>(null);
+  const aiDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dbDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const trimmed = query.trim();
   const localResults = trimmed ? searchExercises(trimmed, currentNames) : getSuggestedExercises(currentNames);
   const noLocalMatch = trimmed.length >= 3 && !localResults.some((r) => r.name.toLowerCase() === trimmed.toLowerCase());
 
-  // Debounced AI lookup for unknown exercises
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!noLocalMatch) { setAiResult(null); setAiLoading(false); return; }
+    getRemainingRequests().then((r) => setDailyLeft(r.daily));
+  }, []);
 
+  // AI lookup for exercises not in local list
+  useEffect(() => {
+    if (aiDebounce.current) clearTimeout(aiDebounce.current);
+    if (!noLocalMatch) { setAiResult(null); setAiLoading(false); return; }
     setAiLoading(true);
     setAiResult(null);
-    debounceRef.current = setTimeout(async () => {
+    aiDebounce.current = setTimeout(async () => {
       try {
         const res = await fetch(`${SUPABASE_URL}/functions/v1/exercise-ai`, {
           method: 'POST',
@@ -79,21 +101,41 @@ function ExercisePicker({
         });
         if (res.ok) {
           const profile = await res.json();
-          if (profile?.muscles) {
-            cacheExerciseProfile(trimmed, profile);
-            setAiResult({ name: trimmed, category: 'AI Generated' });
-          }
+          if (profile?.muscles) { cacheExerciseProfile(trimmed, profile); setAiResult({ name: trimmed }); }
         }
       } catch {}
       setAiLoading(false);
     }, 500);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    return () => { if (aiDebounce.current) clearTimeout(aiDebounce.current); };
   }, [trimmed, noLocalMatch]);
+
+  // ExerciseDB search — check in-memory cache first, API only if needed
+  useEffect(() => {
+    if (dbDebounce.current) clearTimeout(dbDebounce.current);
+    if (trimmed.length < 3) { setDbResults([]); return; }
+
+    const cached = searchFromCache(trimmed);
+    if (cached.length > 0) { setDbResults(cached); return; }
+
+    setDbSearching(true);
+    dbDebounce.current = setTimeout(async () => {
+      const results = await searchExerciseDB(trimmed);
+      setDbResults(results);
+      setDbSearching(false);
+      getRemainingRequests().then((r) => setDailyLeft(r.daily));
+    }, 700);
+    return () => { if (dbDebounce.current) clearTimeout(dbDebounce.current); };
+  }, [trimmed]);
 
   const grouped = localResults.reduce<Record<string, typeof localResults>>((acc, ex) => {
     (acc[ex.category] = acc[ex.category] ?? []).push(ex);
     return acc;
   }, {});
+
+  const filteredDb = dbResults.filter(
+    (r) => !localResults.some((l) => l.name.toLowerCase() === r.name.toLowerCase())
+      && !currentNames.some((n) => n.toLowerCase() === r.name.toLowerCase())
+  );
 
   return (
     <Modal transparent animationType="slide" onRequestClose={onClose}>
@@ -105,7 +147,7 @@ function ExercisePicker({
               style={st.epSearchInput}
               value={query}
               onChangeText={setQuery}
-              placeholder="Search or type any exercise..."
+              placeholder="Search exercises or database..."
               placeholderTextColor={BrutlColors.textDisabled}
               autoFocus
             />
@@ -113,47 +155,40 @@ function ExercisePicker({
               <BrutlText style={st.epCloseBtn}>✕</BrutlText>
             </TouchableOpacity>
           </View>
+
           {!trimmed && (
             <BrutlText style={st.epHint}>
               {currentNames.length > 0 ? 'SUGGESTED FOR YOUR SPLIT' : 'ALL EXERCISES'}
             </BrutlText>
           )}
+
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            {/* AI-generated result for unknown exercise */}
+            {/* AI result for unknown exercises */}
             {aiLoading && noLocalMatch && (
               <View style={[st.epExRow, { opacity: 0.6 }]}>
                 <BrutlText style={st.epExName}>Looking up "{trimmed}" via AI…</BrutlText>
               </View>
             )}
             {aiResult && (
-              <TouchableOpacity
-                style={st.epExRow}
-                onPress={() => { onSelect(aiResult.name); onClose(); }}
-              >
+              <TouchableOpacity style={st.epExRow} onPress={() => { onSelect(aiResult.name); onClose(); }}>
                 <BrutlText style={[st.epExName, { flex: 1 }]}>{aiResult.name}</BrutlText>
                 <View style={[st.epAiBadge, { backgroundColor: 'rgba(226,75,74,0.25)' }]}>
                   <BrutlText style={st.epAiBadgeTxt}>AI ✦</BrutlText>
                 </View>
               </TouchableOpacity>
             )}
-            {/* Custom fallback if AI also found nothing */}
             {noLocalMatch && !aiLoading && !aiResult && trimmed.length >= 2 && (
-              <TouchableOpacity
-                style={st.epExRow}
-                onPress={() => { onSelect(trimmed); onClose(); }}
-              >
+              <TouchableOpacity style={st.epExRow} onPress={() => { onSelect(trimmed); onClose(); }}>
                 <BrutlText style={[st.epExName, { color: BrutlColors.accent }]}>+ Add "{trimmed}" as custom</BrutlText>
               </TouchableOpacity>
             )}
+
+            {/* Local exercise list */}
             {Object.entries(grouped).map(([cat, items]) => (
               <View key={cat}>
                 <BrutlText style={st.epCatLabel}>{cat.toUpperCase()}</BrutlText>
                 {items.map((ex) => (
-                  <TouchableOpacity
-                    key={ex.name}
-                    style={st.epExRow}
-                    onPress={() => { onSelect(ex.name); onClose(); }}
-                  >
+                  <TouchableOpacity key={ex.name} style={st.epExRow} onPress={() => { onSelect(ex.name); onClose(); }}>
                     <BrutlText style={st.epExName}>{ex.name}</BrutlText>
                     {ex.hasProfile && (
                       <View style={st.epAiBadge}>
@@ -164,7 +199,46 @@ function ExercisePicker({
                 ))}
               </View>
             ))}
+
+            {/* ExerciseDB results */}
+            {trimmed.length >= 3 && (filteredDb.length > 0 || dbSearching) && (
+              <View>
+                <BrutlText style={st.epCatLabel}>FROM DATABASE</BrutlText>
+                {dbSearching && (
+                  <View style={[st.epExRow, { opacity: 0.5 }]}>
+                    <BrutlText style={st.epExName}>Searching database…</BrutlText>
+                  </View>
+                )}
+                {filteredDb.map((ex) => (
+                  <TouchableOpacity key={ex.id} style={st.epExRow} onPress={() => { onSelect(ex.name); onClose(); }}>
+                    <View style={{ flex: 1 }}>
+                      <BrutlText style={st.epExName}>{ex.name}</BrutlText>
+                      <BrutlText style={{ fontSize: 10, color: BrutlColors.textDisabled, marginTop: 1 }}>
+                        {ex.bodyPart} · {ex.equipment}
+                      </BrutlText>
+                    </View>
+                    <View style={[st.epAiBadge, {
+                      borderColor: difficultyColor(ex.difficulty),
+                      backgroundColor: `${difficultyColor(ex.difficulty)}18`,
+                    }]}>
+                      <BrutlText style={[st.epAiBadgeTxt, { color: difficultyColor(ex.difficulty) }]}>
+                        {ex.difficulty.toUpperCase()}
+                      </BrutlText>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </ScrollView>
+
+          {dailyLeft !== null && (
+            <BrutlText style={{
+              fontSize: 9, textAlign: 'center', paddingTop: 6,
+              color: dailyLeft <= 5 ? BrutlColors.accent : BrutlColors.textDisabled,
+            }}>
+              {dailyLeft} database lookups remaining today
+            </BrutlText>
+          )}
         </View>
       </View>
     </Modal>
@@ -674,10 +748,20 @@ function InfoSheet({
   const slideY = useRef(new Animated.Value(SCREEN_H * 0.7)).current;
   const profile = getExerciseProfile(exercise);
   const muscles = getTopMuscles(exercise, 4);
+  const [dbEntry, setDbEntry] = useState<ExerciseDBEntry | null>(() => getExerciseFromCache(exercise));
+  const [dbLoading, setDbLoading] = useState(false);
+  const [showGif, setShowGif] = useState(false);
 
   useEffect(() => {
     Animated.spring(slideY, { toValue: 0, useNativeDriver: true, tension: 80, friction: 12 }).start();
   }, []);
+
+  async function loadFromDB() {
+    setDbLoading(true);
+    const entry = await getExerciseByName(exercise);
+    setDbEntry(entry);
+    setDbLoading(false);
+  }
 
   function close() {
     Animated.timing(slideY, { toValue: SCREEN_H * 0.7, duration: 220, useNativeDriver: true }).start(onClose);
@@ -691,48 +775,148 @@ function InfoSheet({
           <View style={st.sheetHandle} />
           <BrutlText style={st.sheetTitle}>{exercise}</BrutlText>
 
-          {profile ? (
-            <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-              {/* Hypertrophy */}
-              <BrutlText style={st.sheetSection}>HYPERTROPHY</BrutlText>
-              {[
-                ['Rep Range', profile.hypertrophy.repRange],
-                ['Sets', profile.hypertrophy.sets],
-                ['RIR', profile.hypertrophy.rir],
-                ['Tempo', profile.hypertrophy.tempo],
-              ].map(([k, v]) => (
-                <View key={k} style={st.kvRow}>
-                  <BrutlText style={st.kvKey}>{k}</BrutlText>
-                  <BrutlText style={st.kvVal}>{v}</BrutlText>
+          <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+
+            {/* ── Database section ───────────────────────────────── */}
+            {dbEntry ? (
+              <>
+                {/* Badges row */}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: BrutlSpacing.md }}>
+                  {[
+                    { label: dbEntry.difficulty.toUpperCase(), color: difficultyColor(dbEntry.difficulty) },
+                    { label: dbEntry.bodyPart.toUpperCase(), color: BrutlColors.textMuted },
+                    { label: dbEntry.equipment.toUpperCase(), color: BrutlColors.textMuted },
+                  ].map(({ label, color }) => (
+                    <View key={label} style={[st.epAiBadge, { borderColor: color, backgroundColor: `${color}18`, paddingHorizontal: 8, paddingVertical: 3 }]}>
+                      <BrutlText style={[st.epAiBadgeTxt, { color, fontSize: 9 }]}>{label}</BrutlText>
+                    </View>
+                  ))}
                 </View>
-              ))}
 
-              {/* Form cues */}
-              <BrutlText style={st.sheetSection}>FORM CUES</BrutlText>
-              {profile.formCues.map((cue, i) => (
-                <BrutlText key={i} style={st.formCue}>· {cue}</BrutlText>
-              ))}
+                {/* Description */}
+                {!!dbEntry.description && (
+                  <BrutlText style={{ fontSize: 12, color: BrutlColors.textMuted, lineHeight: 18, marginBottom: BrutlSpacing.md }}>
+                    {dbEntry.description}
+                  </BrutlText>
+                )}
 
-              {/* Recovery */}
-              <BrutlText style={st.sheetSection}>MUSCLE RECOVERY</BrutlText>
-              {muscles.map((m) => {
-                const status = getMuscleRecoveryStatus(m.name, recentLogs);
-                const color = status === 'ready' ? BrutlColors.success
-                  : status === 'recovering' ? BrutlColors.warning
-                  : BrutlColors.accent;
-                return (
-                  <View key={m.name} style={st.kvRow}>
-                    <BrutlText style={st.kvKey}>{m.name}</BrutlText>
-                    <BrutlText style={[st.kvVal, { color }]}>{status.toUpperCase()}</BrutlText>
+                {/* GIF */}
+                {showGif ? (
+                  <View style={{ marginBottom: BrutlSpacing.md }}>
+                    <Image
+                      source={{ uri: dbEntry.gifUrl }}
+                      style={{ width: '100%', aspectRatio: 1, borderRadius: BrutlRadius.sm, backgroundColor: '#111' }}
+                      resizeMode="contain"
+                    />
+                    <TouchableOpacity onPress={() => setShowGif(false)} style={{ alignSelf: 'flex-end', marginTop: 4 }}>
+                      <BrutlText style={{ fontSize: 10, color: BrutlColors.textDisabled }}>Hide GIF</BrutlText>
+                    </TouchableOpacity>
                   </View>
-                );
-              })}
-            </ScrollView>
-          ) : (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-              <BrutlText style={st.kvKey}>No AI profile for this exercise yet.</BrutlText>
-            </View>
-          )}
+                ) : (
+                  <TouchableOpacity
+                    style={st.gifBtn}
+                    onPress={() => setShowGif(true)}
+                  >
+                    <Ionicons name="play-circle-outline" size={14} color={BrutlColors.textMuted} />
+                    <BrutlText style={{ fontSize: 11, color: BrutlColors.textMuted }}>View exercise GIF</BrutlText>
+                  </TouchableOpacity>
+                )}
+
+                {/* Muscles */}
+                <BrutlText style={st.sheetSection}>MUSCLES</BrutlText>
+                <View style={st.kvRow}>
+                  <BrutlText style={st.kvKey}>Primary</BrutlText>
+                  <BrutlText style={[st.kvVal, { color: BrutlColors.accent }]}>{dbEntry.target}</BrutlText>
+                </View>
+                {dbEntry.secondaryMuscles.map((m) => (
+                  <View key={m} style={st.kvRow}>
+                    <BrutlText style={st.kvKey}>Secondary</BrutlText>
+                    <BrutlText style={st.kvVal}>{m}</BrutlText>
+                  </View>
+                ))}
+
+                {/* Step-by-step instructions */}
+                <BrutlText style={st.sheetSection}>INSTRUCTIONS</BrutlText>
+                {dbEntry.instructions.map((step, i) => (
+                  <View key={i} style={{ flexDirection: 'row', gap: 8, paddingVertical: 4 }}>
+                    <BrutlText style={{ fontSize: 10, color: BrutlColors.accent, width: 16 }}>{i + 1}.</BrutlText>
+                    <BrutlText style={[st.formCue, { flex: 1, paddingVertical: 0 }]}>{step}</BrutlText>
+                  </View>
+                ))}
+              </>
+            ) : (
+              <TouchableOpacity
+                style={[st.sheetClose, { marginBottom: BrutlSpacing.md, borderColor: BrutlColors.accent }]}
+                onPress={loadFromDB}
+                disabled={dbLoading}
+              >
+                <BrutlText style={{ fontSize: 12, color: BrutlColors.accent, fontFamily: BrutlFonts.display, letterSpacing: 1 }}>
+                  {dbLoading ? 'LOADING…' : 'LOAD FROM DATABASE (1 REQUEST)'}
+                </BrutlText>
+              </TouchableOpacity>
+            )}
+
+            {/* ── AI section ─────────────────────────────────────── */}
+            {profile && (
+              <>
+                <BrutlText style={st.sheetSection}>HYPERTROPHY</BrutlText>
+                {([
+                  ['Rep Range', profile.hypertrophy.repRange],
+                  ['Sets', profile.hypertrophy.sets],
+                  ['RIR', profile.hypertrophy.rir],
+                  ['Tempo', profile.hypertrophy.tempo],
+                ] as [string, string][]).map(([k, v]) => (
+                  <View key={k} style={st.kvRow}>
+                    <BrutlText style={st.kvKey}>{k}</BrutlText>
+                    <BrutlText style={st.kvVal}>{v}</BrutlText>
+                  </View>
+                ))}
+
+                {!dbEntry && (
+                  <>
+                    <BrutlText style={st.sheetSection}>FORM CUES</BrutlText>
+                    {profile.formCues.map((cue, i) => (
+                      <BrutlText key={i} style={st.formCue}>· {cue}</BrutlText>
+                    ))}
+                  </>
+                )}
+
+                {muscles.length > 0 && (
+                  <>
+                    <BrutlText style={st.sheetSection}>ACTIVATION</BrutlText>
+                    {muscles.map((m) => (
+                      <MuscleBar key={m.name} name={m.name} pct={m.activationPct} tier={m.tier} />
+                    ))}
+                  </>
+                )}
+              </>
+            )}
+
+            {/* ── Recovery ───────────────────────────────────────── */}
+            {muscles.length > 0 && (
+              <>
+                <BrutlText style={st.sheetSection}>MUSCLE RECOVERY</BrutlText>
+                {muscles.map((m) => {
+                  const status = getMuscleRecoveryStatus(m.name, recentLogs);
+                  const color = status === 'ready' ? BrutlColors.success
+                    : status === 'recovering' ? BrutlColors.warning
+                    : BrutlColors.accent;
+                  return (
+                    <View key={m.name} style={st.kvRow}>
+                      <BrutlText style={st.kvKey}>{m.name}</BrutlText>
+                      <BrutlText style={[st.kvVal, { color }]}>{status.toUpperCase()}</BrutlText>
+                    </View>
+                  );
+                })}
+              </>
+            )}
+
+            {!dbEntry && !profile && (
+              <View style={{ alignItems: 'center', paddingVertical: BrutlSpacing.xl }}>
+                <BrutlText style={st.kvKey}>Load from database or search to get exercise info.</BrutlText>
+              </View>
+            )}
+          </ScrollView>
 
           <TouchableOpacity style={st.sheetClose} onPress={close}>
             <BrutlText style={st.sheetCloseTxt}>CLOSE</BrutlText>
@@ -1364,6 +1548,18 @@ const st = StyleSheet.create({
   kvKey: { fontSize: 11, color: BrutlColors.textMuted },
   kvVal: { fontSize: 11, color: BrutlColors.textPrimary },
   formCue: { fontSize: 11, color: '#888888', paddingVertical: 3, lineHeight: 17 },
+  gifBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: BrutlColors.borderVisible,
+    borderRadius: BrutlRadius.sm,
+    paddingHorizontal: BrutlSpacing.sm,
+    paddingVertical: 6,
+    marginBottom: BrutlSpacing.md,
+  },
   sheetClose: {
     marginTop: BrutlSpacing.md,
     borderWidth: 1,
