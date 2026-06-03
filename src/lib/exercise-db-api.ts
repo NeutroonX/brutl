@@ -1,7 +1,7 @@
 import { Alert } from 'react-native';
 import { STORAGE_KEYS, storageGet, storageSet } from '@/lib/storage';
 
-const RAPID_API_KEY = '94b531cfe7msh6af45ed70dff19dp102983jsnd141acc73426';
+const RAPID_API_KEY = process.env.EXPO_PUBLIC_RAPID_API_KEY ?? '';
 const BASE_URL = 'https://exercisedb.p.rapidapi.com';
 
 const DAILY_LIMIT = 35;
