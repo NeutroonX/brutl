@@ -91,6 +91,274 @@ function isFavourited(favs: MealEntry[], food: MealEntry) {
   return favs.some((f) => f.name.toLowerCase() === food.name.toLowerCase());
 }
 
+// ─── Manual Add Sheet ─────────────────────────────────────────────────────────
+
+function ManualAddSheet({
+  visible,
+  onConfirm,
+  onCancel,
+  isFav,
+  onToggleFav,
+}: {
+  visible: boolean;
+  onConfirm: (food: MealEntry) => void;
+  onCancel: () => void;
+  isFav: (food: MealEntry) => boolean;
+  onToggleFav: (food: MealEntry) => void;
+}) {
+  const [name, setName] = useState('');
+  const [calories, setCalories] = useState('');
+  const [protein, setProtein] = useState('');
+  const [carbs, setCarbs] = useState('');
+  const [fat, setFat] = useState('');
+  const [serving, setServing] = useState('100');
+
+  function reset() {
+    setName(''); setCalories(''); setProtein('');
+    setCarbs(''); setFat(''); setServing('100');
+  }
+
+  function handleClose() { reset(); onCancel(); }
+
+  function handleAdd() {
+    if (!name.trim()) return;
+    const food: MealEntry = {
+      name: name.trim(),
+      calories: parseFloat(calories) || 0,
+      proteinG: parseFloat(protein) || 0,
+      carbsG: parseFloat(carbs) || 0,
+      fatG: parseFloat(fat) || 0,
+      servingG: parseFloat(serving) || 100,
+    };
+    onConfirm(food);
+    reset();
+  }
+
+  const canAdd = name.trim().length > 0;
+  const preview: MealEntry = {
+    name: name.trim() || 'My Food',
+    calories: parseFloat(calories) || 0,
+    proteinG: parseFloat(protein) || 0,
+    carbsG: parseFloat(carbs) || 0,
+    fatG: parseFloat(fat) || 0,
+    servingG: parseFloat(serving) || 100,
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={handleClose}>
+      <KeyboardAvoidingView style={ma.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={ma.sheet}>
+          <View style={ma.handle} />
+
+          {/* Title row */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <BrutlText style={ma.title}>ADD MANUALLY</BrutlText>
+            <TouchableOpacity
+              onPress={() => onToggleFav(preview)}
+              style={ma.starBtn}
+              disabled={!canAdd}
+            >
+              <Ionicons
+                name={canAdd && isFav(preview) ? 'star' : 'star-outline'}
+                size={20}
+                color={canAdd && isFav(preview) ? '#F5C518' : BrutlColors.textDisabled}
+              />
+              <BrutlText style={{ fontSize: 9, color: BrutlColors.textDisabled, marginTop: 2 }}>
+                {canAdd && isFav(preview) ? 'SAVED' : 'FAVOURITE'}
+              </BrutlText>
+            </TouchableOpacity>
+          </View>
+
+          {/* Name input */}
+          <View style={ma.fieldGroup}>
+            <BrutlText style={ma.fieldLabel}>FOOD NAME</BrutlText>
+            <TextInput
+              style={ma.nameInput}
+              value={name}
+              onChangeText={setName}
+              placeholder="e.g. Chicken breast, Dosa..."
+              placeholderTextColor={BrutlColors.textDisabled}
+              autoCapitalize="words"
+              returnKeyType="next"
+            />
+          </View>
+
+          {/* Serving */}
+          <View style={ma.fieldGroup}>
+            <BrutlText style={ma.fieldLabel}>SERVING SIZE</BrutlText>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: BrutlSpacing.sm }}>
+              <TouchableOpacity
+                style={ma.stepBtn}
+                onPress={() => setServing(String(Math.max(5, (parseFloat(serving) || 100) - 10)))}
+              >
+                <BrutlText style={ma.stepTxt}>−</BrutlText>
+              </TouchableOpacity>
+              <TextInput
+                style={[ma.macroInput, { flex: 1, textAlign: 'center' }]}
+                value={serving}
+                onChangeText={setServing}
+                keyboardType="number-pad"
+              />
+              <BrutlText style={ma.fieldLabel}>g</BrutlText>
+              <TouchableOpacity
+                style={ma.stepBtn}
+                onPress={() => setServing(String((parseFloat(serving) || 100) + 10))}
+              >
+                <BrutlText style={ma.stepTxt}>+</BrutlText>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Macro inputs — 2×2 grid */}
+          <View style={{ gap: BrutlSpacing.sm }}>
+            <View style={{ flexDirection: 'row', gap: BrutlSpacing.sm }}>
+              {[
+                { label: 'CALORIES (kcal)', val: calories, set: setCalories },
+                { label: 'PROTEIN (g)', val: protein, set: setProtein },
+              ].map(({ label, val, set }) => (
+                <View key={label} style={{ flex: 1, gap: 4 }}>
+                  <BrutlText style={ma.fieldLabel}>{label}</BrutlText>
+                  <TextInput
+                    style={ma.macroInput}
+                    value={val}
+                    onChangeText={set}
+                    keyboardType="decimal-pad"
+                    placeholder="0"
+                    placeholderTextColor={BrutlColors.textDisabled}
+                  />
+                </View>
+              ))}
+            </View>
+            <View style={{ flexDirection: 'row', gap: BrutlSpacing.sm }}>
+              {[
+                { label: 'CARBS (g)', val: carbs, set: setCarbs },
+                { label: 'FAT (g)', val: fat, set: setFat },
+              ].map(({ label, val, set }) => (
+                <View key={label} style={{ flex: 1, gap: 4 }}>
+                  <BrutlText style={ma.fieldLabel}>{label}</BrutlText>
+                  <TextInput
+                    style={ma.macroInput}
+                    value={val}
+                    onChangeText={set}
+                    keyboardType="decimal-pad"
+                    placeholder="0"
+                    placeholderTextColor={BrutlColors.textDisabled}
+                  />
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Preview macro boxes */}
+          {canAdd && (
+            <View style={ma.previewRow}>
+              {[
+                { label: 'KCAL', val: preview.calories, unit: '' },
+                { label: 'PROTEIN', val: preview.proteinG, unit: 'g' },
+                { label: 'CARBS', val: preview.carbsG, unit: 'g' },
+                { label: 'FAT', val: preview.fatG, unit: 'g' },
+              ].map((m) => (
+                <View key={m.label} style={ma.previewBox}>
+                  <BrutlText style={ma.previewVal}>{m.val}{m.unit}</BrutlText>
+                  <BrutlText style={ma.previewLabel}>{m.label}</BrutlText>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Buttons */}
+          <View style={{ flexDirection: 'row', gap: BrutlSpacing.sm }}>
+            <TouchableOpacity style={[ma.btn, ma.cancelBtn]} onPress={handleClose}>
+              <BrutlText style={ma.cancelTxt}>CANCEL</BrutlText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[ma.btn, ma.addBtn, !canAdd && { opacity: 0.4 }]}
+              onPress={handleAdd}
+              disabled={!canAdd}
+            >
+              <BrutlText style={ma.addTxt}>ADD TO LOG</BrutlText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+const ma = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.75)', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: '#111111',
+    borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    padding: BrutlSpacing.xl, gap: BrutlSpacing.md,
+    paddingBottom: 36,
+    borderTopWidth: 1, borderColor: '#2A2A2A',
+  },
+  handle: {
+    width: 36, height: 4, borderRadius: 2,
+    backgroundColor: BrutlColors.borderVisible,
+    alignSelf: 'center', marginBottom: BrutlSpacing.xs,
+  },
+  title: {
+    fontFamily: 'BebasNeue_400Regular',
+    fontSize: 22, letterSpacing: 1,
+    color: BrutlColors.textPrimary,
+  },
+  starBtn: { alignItems: 'center', gap: 2 },
+  fieldGroup: { gap: 5 },
+  fieldLabel: { fontSize: 9, color: BrutlColors.textDisabled, letterSpacing: 1 },
+  nameInput: {
+    backgroundColor: BrutlColors.bg,
+    borderRadius: BrutlRadius.sm, borderWidth: 1,
+    borderColor: BrutlColors.borderVisible,
+    color: BrutlColors.textPrimary,
+    fontFamily: BrutlFonts.body,
+    fontSize: 15,
+    paddingHorizontal: BrutlSpacing.md,
+    paddingVertical: BrutlSpacing.sm + 2,
+  },
+  macroInput: {
+    backgroundColor: BrutlColors.bg,
+    borderRadius: BrutlRadius.sm, borderWidth: 1,
+    borderColor: BrutlColors.borderVisible,
+    color: BrutlColors.textPrimary,
+    fontFamily: BrutlFonts.body,
+    fontSize: 15,
+    paddingHorizontal: BrutlSpacing.md,
+    paddingVertical: BrutlSpacing.sm,
+    textAlign: 'right',
+  },
+  stepBtn: {
+    width: 38, height: 38, borderRadius: BrutlRadius.sm,
+    backgroundColor: BrutlColors.bg,
+    borderWidth: 1, borderColor: BrutlColors.borderVisible,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  stepTxt: { fontSize: 20, color: BrutlColors.accent, lineHeight: 22 },
+  previewRow: { flexDirection: 'row', gap: BrutlSpacing.sm },
+  previewBox: {
+    flex: 1, alignItems: 'center',
+    backgroundColor: BrutlColors.bg,
+    borderRadius: BrutlRadius.sm, borderWidth: 1,
+    borderColor: BrutlColors.borderVisible,
+    paddingVertical: BrutlSpacing.sm, gap: 2,
+  },
+  previewVal: {
+    fontFamily: 'BebasNeue_400Regular',
+    fontSize: 20, color: BrutlColors.textPrimary,
+  },
+  previewLabel: { fontSize: 9, color: BrutlColors.textMuted, letterSpacing: 0.5 },
+  btn: {
+    flex: 1, borderRadius: BrutlRadius.sm,
+    paddingVertical: BrutlSpacing.md,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  cancelBtn: { borderWidth: 1, borderColor: BrutlColors.borderVisible },
+  cancelTxt: { fontSize: 13, color: BrutlColors.textMuted, fontFamily: 'BebasNeue_400Regular', letterSpacing: 1 },
+  addBtn: { backgroundColor: BrutlColors.accent, flex: 2 },
+  addTxt: { fontSize: 14, color: '#fff', fontFamily: 'BebasNeue_400Regular', letterSpacing: 1 },
+});
+
 // ─── MacroChip (Option E) ─────────────────────────────────────────────────────
 
 function MacroChip({ label, value, target, unit, color }: {
@@ -216,6 +484,7 @@ export default function DietScreen() {
   const [favourites, setFavourites] = useState<MealEntry[]>([]);
   const [showBarcode, setShowBarcode] = useState(false);
   const [showPhoto, setShowPhoto] = useState(false);
+  const [showManual, setShowManual] = useState(false);
   const [pendingScan, setPendingScan] = useState<ScannedFood | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -321,6 +590,13 @@ export default function DietScreen() {
       <BarcodeScanModal visible={showBarcode} onResult={handleScannedFood} onClose={() => setShowBarcode(false)} />
       <PhotoScanModal visible={showPhoto} onResult={handleScannedFood} onClose={() => setShowPhoto(false)} />
       <ScanConfirmSheet food={pendingScan} onConfirm={handleConfirmScan} onCancel={() => setPendingScan(null)} />
+      <ManualAddSheet
+        visible={showManual}
+        onConfirm={async (food) => { setShowManual(false); await handleAdd(food); }}
+        onCancel={() => setShowManual(false)}
+        isFav={(food) => isFavourited(favourites, food)}
+        onToggleFav={toggleFavourite}
+      />
 
       <ScrollView
         style={st.scroll}
@@ -332,6 +608,9 @@ export default function DietScreen() {
         <View style={st.header}>
           <BrutlText style={st.title}>DIET LOG</BrutlText>
           <View style={st.headerIcons}>
+            <TouchableOpacity style={st.iconBtn} onPress={() => setShowManual(true)} hitSlop={8}>
+              <Ionicons name="create-outline" size={20} color={BrutlColors.textPrimary} />
+            </TouchableOpacity>
             <TouchableOpacity style={st.iconBtn} onPress={() => setShowBarcode(true)} hitSlop={8}>
               <Ionicons name="barcode-outline" size={22} color={BrutlColors.textPrimary} />
             </TouchableOpacity>
