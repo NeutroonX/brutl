@@ -43,6 +43,7 @@ import { calcWorkoutXP } from '@/lib/xp';
 import { useRoutineStore } from '@/stores/routine.store';
 import { useUserStore } from '@/stores/user.store';
 import { useWorkoutStore } from '@/stores/workout.store';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ExerciseSet } from '@/types';
 
 const SCREEN_H = Dimensions.get('window').height;
@@ -957,6 +958,7 @@ function SummarySheet({ data, onClose }: { data: SummaryData | null; onClose: ()
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function WorkoutScreen() {
+  const insets = useSafeAreaInsets();
   const profile = useUserStore((s) => s.profile);
   const updateXP = useUserStore((s) => s.updateXP);
   const addLog = useWorkoutStore((s) => s.addLog);
@@ -1186,7 +1188,7 @@ export default function WorkoutScreen() {
       <XPToast amount={xpPending} onHide={clearXP} />
 
       {/* Fixed session header */}
-      <View style={st.header}>
+      <View style={[st.header, { paddingTop: insets.top + BrutlSpacing.sm }]}>
         <View>
           <BrutlText style={st.headerSplit}>{splitName}</BrutlText>
           <BrutlText style={st.headerSub}>Strength & Size · Week {week}</BrutlText>
@@ -1341,7 +1343,7 @@ const st = StyleSheet.create({
   },
   headerSplit: {
     fontFamily: BrutlFonts.display,
-    fontSize: 24,
+    fontSize: 28,
     color: BrutlColors.textPrimary,
     letterSpacing: 1,
   },

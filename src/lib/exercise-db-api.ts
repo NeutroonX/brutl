@@ -1,7 +1,7 @@
 import { Alert } from 'react-native';
 import { STORAGE_KEYS, storageGet, storageSet } from '@/lib/storage';
+import { getApiKey } from '@/lib/api-keys';
 
-const RAPID_API_KEY = process.env.EXPO_PUBLIC_RAPID_API_KEY ?? '';
 const BASE_URL = 'https://exercisedb.p.rapidapi.com';
 
 const DAILY_LIMIT = 35;
@@ -93,7 +93,7 @@ async function apiFetch<T>(path: string): Promise<T | null> {
     const res = await fetch(`${BASE_URL}${path}`, {
       headers: {
         'x-rapidapi-host': 'exercisedb.p.rapidapi.com',
-        'x-rapidapi-key': RAPID_API_KEY,
+        'x-rapidapi-key': getApiKey('RAPID_API_KEY', process.env.EXPO_PUBLIC_RAPID_API_KEY ?? ''),
         'Content-Type': 'application/json',
       },
     });

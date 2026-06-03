@@ -485,12 +485,29 @@ export default function DietScreen() {
   const [pendingScan, setPendingScan] = useState<ScannedFood | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [waterMl, setWaterMl]       = useState(0);
+  const [waterLimit, setWaterLimit] = useState(2500);
+  const [waterGoalOpen, setWaterGoalOpen] = useState(false);
+
   // Load favourites from storage
   useEffect(() => {
     storageGet<MealEntry[]>(STORAGE_KEYS.dietFavourites).then((f) => {
       if (f) setFavourites(f);
     });
   }, []);
+
+  // Load water
+  useEffect(() => {
+    storageGet<{ dateKey: string; ml: number; limitMl: number }>(STORAGE_KEYS.water).then((w) => {
+      const k = (() => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; })();
+      if (w) { setWaterLimit(w.limitMl); if (w.dateKey === k) setWaterMl(w.ml); }
+    });
+  }, []);
+
+  async function saveWater(ml: number, limitMl: number) {
+    const k = (() => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; })();
+    await storageSet(STORAGE_KEYS.water, { dateKey: k, ml, limitMl });
+  }
 
   // Search on query change
   useEffect(() => {
@@ -633,6 +650,57 @@ export default function DietScreen() {
             <MacroChip value={Math.round(todayLog?.totalFatG ?? 0)} target={targets.fatG} unit="G" label="FAT" color={MACRO_COLORS.fat} />
           </View>
         )}
+
+        {/* Water */}
+        {(() => {
+          const BLUE = '#4A8FD4';
+          const pct = Math.min(1, waterLimit > 0 ? waterMl / waterLimit : 0);
+          const color = pct >= 1 ? BrutlColors.success : BLUE;
+          return (
+            <View style={st.waterCard}>
+              <View style={st.waterTop}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                  <Ionicons name="water-outline" size={13} color={color} />
+                  <BrutlText style={[st.waterLabel, { color }]}>WATER</BrutlText>
+                </View>
+                <TouchableOpacity onPress={() => setWaterGoalOpen((v) => !v)} hitSlop={10} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <BrutlText style={st.waterGoalTxt}>{(waterLimit / 1000).toFixed(1)}L goal</BrutlText>
+                  <Ionicons name={waterGoalOpen ? 'chevron-up' : 'chevron-down'} size={11} color={BrutlColors.textDisabled} />
+                </TouchableOpacity>
+              </View>
+              {waterGoalOpen && (
+                <View style={st.waterGoalRow}>
+                  <TouchableOpacity style={st.waterGoalBtn} onPress={() => { const n = Math.max(500, waterLimit - 250); setWaterLimit(n); saveWater(waterMl, n); }}>
+                    <Ionicons name="remove" size={16} color={BrutlColors.textMuted} />
+                  </TouchableOpacity>
+                  <BrutlText style={st.waterGoalVal}>{waterLimit}ml</BrutlText>
+                  <TouchableOpacity style={st.waterGoalBtn} onPress={() => { const n = waterLimit + 250; setWaterLimit(n); saveWater(waterMl, n); }}>
+                    <Ionicons name="add" size={16} color={BrutlColors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+              )}
+              <View style={st.waterBody}>
+                <View style={{ flex: 1, gap: 4 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+                    <BrutlText style={[st.waterAmount, { color }]}>{waterMl}</BrutlText>
+                    <BrutlText style={st.waterUnit}>ml</BrutlText>
+                  </View>
+                  <View style={st.waterTrack}><View style={[st.waterFill, { width: `${Math.round(pct * 100)}%` as any, backgroundColor: color }]} /></View>
+                  <BrutlText style={st.waterSub}>{pct >= 1 ? 'Goal reached!' : `${waterLimit - waterMl}ml remaining`}</BrutlText>
+                </View>
+                <View style={{ flexDirection: 'row', gap: BrutlSpacing.xs }}>
+                  <TouchableOpacity style={st.waterBtn} onPress={() => { const n = Math.max(0, waterMl - 250); setWaterMl(n); saveWater(n, waterLimit); }}>
+                    <Ionicons name="remove" size={18} color={BrutlColors.textMuted} />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[st.waterBtn, { borderColor: color + '55' }]} onPress={() => { const n = waterMl + 250; setWaterMl(n); saveWater(n, waterLimit); }}>
+                    <Ionicons name="add" size={20} color={color} />
+                    <BrutlText style={[st.waterBtnTxt, { color }]}>250ml</BrutlText>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          );
+        })()}
 
         {/* Search */}
         <View style={st.section}>
@@ -844,4 +912,20 @@ const st = StyleSheet.create({
   mealName: { fontSize: 14, color: BrutlColors.textPrimary, fontFamily: BrutlFonts.body },
   mealMacros: { fontSize: 11, color: BrutlColors.textMuted },
   deleteBtn: { padding: 2 },
+
+  waterCard: { backgroundColor: BrutlColors.bgCard, borderRadius: BrutlRadius.md, borderWidth: 1, borderColor: BrutlColors.borderVisible, padding: BrutlSpacing.md, gap: BrutlSpacing.sm },
+  waterTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  waterLabel: { fontSize: 11, letterSpacing: 1.5 },
+  waterGoalTxt: { fontSize: 10, color: BrutlColors.textDisabled },
+  waterGoalRow: { flexDirection: 'row', alignItems: 'center', gap: BrutlSpacing.sm, paddingVertical: BrutlSpacing.xs },
+  waterGoalBtn: { width: 32, height: 32, borderRadius: BrutlRadius.sm, borderWidth: 1, borderColor: BrutlColors.borderVisible, alignItems: 'center', justifyContent: 'center' },
+  waterGoalVal: { fontFamily: BrutlFonts.mono, fontSize: 13, color: BrutlColors.textPrimary, minWidth: 64, textAlign: 'center' },
+  waterBody: { flexDirection: 'row', alignItems: 'center', gap: BrutlSpacing.md },
+  waterAmount: { fontFamily: 'BebasNeue_400Regular', fontSize: 32, lineHeight: 34 },
+  waterUnit: { fontSize: 11, color: BrutlColors.textMuted, marginBottom: 4 },
+  waterTrack: { height: 3, backgroundColor: BrutlColors.border, borderRadius: 2, overflow: 'hidden' },
+  waterFill: { height: 3, borderRadius: 2 },
+  waterSub: { fontSize: 10, color: BrutlColors.textDisabled },
+  waterBtn: { width: 48, height: 48, borderRadius: BrutlRadius.md, borderWidth: 1, borderColor: BrutlColors.borderVisible, backgroundColor: BrutlColors.bg, alignItems: 'center', justifyContent: 'center', gap: 2 },
+  waterBtnTxt: { fontSize: 9, letterSpacing: 0.5 },
 });
