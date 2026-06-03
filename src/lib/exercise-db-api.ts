@@ -20,7 +20,6 @@ export interface ExerciseDBEntry {
   description: string;
   difficulty: string;
   category: string;
-  gifUrl: string;
 }
 
 interface ApiUsage {

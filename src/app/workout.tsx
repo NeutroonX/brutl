@@ -3,7 +3,6 @@ import {
   Alert,
   Animated,
   Dimensions,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -750,7 +749,6 @@ function InfoSheet({
   const muscles = getTopMuscles(exercise, 4);
   const [dbEntry, setDbEntry] = useState<ExerciseDBEntry | null>(() => getExerciseFromCache(exercise));
   const [dbLoading, setDbLoading] = useState(false);
-  const [showGif, setShowGif] = useState(false);
 
   useEffect(() => {
     Animated.spring(slideY, { toValue: 0, useNativeDriver: true, tension: 80, friction: 12 }).start();
@@ -798,28 +796,6 @@ function InfoSheet({
                   <BrutlText style={{ fontSize: 12, color: BrutlColors.textMuted, lineHeight: 18, marginBottom: BrutlSpacing.md }}>
                     {dbEntry.description}
                   </BrutlText>
-                )}
-
-                {/* GIF */}
-                {showGif ? (
-                  <View style={{ marginBottom: BrutlSpacing.md }}>
-                    <Image
-                      source={{ uri: dbEntry.gifUrl }}
-                      style={{ width: '100%', aspectRatio: 1, borderRadius: BrutlRadius.sm, backgroundColor: '#111' }}
-                      resizeMode="contain"
-                    />
-                    <TouchableOpacity onPress={() => setShowGif(false)} style={{ alignSelf: 'flex-end', marginTop: 4 }}>
-                      <BrutlText style={{ fontSize: 10, color: BrutlColors.textDisabled }}>Hide GIF</BrutlText>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    style={st.gifBtn}
-                    onPress={() => setShowGif(true)}
-                  >
-                    <Ionicons name="play-circle-outline" size={14} color={BrutlColors.textMuted} />
-                    <BrutlText style={{ fontSize: 11, color: BrutlColors.textMuted }}>View exercise GIF</BrutlText>
-                  </TouchableOpacity>
                 )}
 
                 {/* Muscles */}
@@ -1548,18 +1524,6 @@ const st = StyleSheet.create({
   kvKey: { fontSize: 11, color: BrutlColors.textMuted },
   kvVal: { fontSize: 11, color: BrutlColors.textPrimary },
   formCue: { fontSize: 11, color: '#888888', paddingVertical: 3, lineHeight: 17 },
-  gifBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderColor: BrutlColors.borderVisible,
-    borderRadius: BrutlRadius.sm,
-    paddingHorizontal: BrutlSpacing.sm,
-    paddingVertical: 6,
-    marginBottom: BrutlSpacing.md,
-  },
   sheetClose: {
     marginTop: BrutlSpacing.md,
     borderWidth: 1,
