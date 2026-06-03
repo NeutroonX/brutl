@@ -84,10 +84,10 @@ const DEFAULT_SPLITS: Split[] = [
         id: 'fb-a',
         name: 'Full Body A',
         exercises: [
-          { name: 'Squat',          targetSets: 3, targetReps: '6-8',  targetWeightKg: 100 },
-          { name: 'Bench Press',    targetSets: 3, targetReps: '6-8',  targetWeightKg: 80 },
-          { name: 'Row',            targetSets: 3, targetReps: '6-8',  targetWeightKg: 70 },
-          { name: 'Overhead Press', targetSets: 3, targetReps: '8-10', targetWeightKg: 50 },
+          { name: 'Squat',             targetSets: 3, targetReps: '6-8',   targetWeightKg: 100 },
+          { name: 'Bench Press',       targetSets: 3, targetReps: '6-8',   targetWeightKg: 80 },
+          { name: 'Row',               targetSets: 3, targetReps: '6-8',   targetWeightKg: 70 },
+          { name: 'Overhead Press',    targetSets: 3, targetReps: '8-10',  targetWeightKg: 50 },
           { name: 'Romanian Deadlift', targetSets: 2, targetReps: '10-12', targetWeightKg: 80 },
         ],
       },
@@ -95,20 +95,28 @@ const DEFAULT_SPLITS: Split[] = [
         id: 'fb-b',
         name: 'Full Body B',
         exercises: [
-          { name: 'Deadlift',       targetSets: 3, targetReps: '4-6',  targetWeightKg: 120 },
-          { name: 'Pull Up',        targetSets: 3, targetReps: '6-10' },
-          { name: 'Incline Bench',  targetSets: 3, targetReps: '8-12', targetWeightKg: 60 },
-          { name: 'Hip Thrust',     targetSets: 3, targetReps: '10-12' },
-          { name: 'Bicep Curl',     targetSets: 2, targetReps: '10-12' },
+          { name: 'Deadlift',      targetSets: 3, targetReps: '4-6',   targetWeightKg: 120 },
+          { name: 'Pull Up',       targetSets: 3, targetReps: '6-10' },
+          { name: 'Incline Bench', targetSets: 3, targetReps: '8-12',  targetWeightKg: 60 },
+          { name: 'Hip Thrust',    targetSets: 3, targetReps: '10-12' },
+          { name: 'Bicep Curl',    targetSets: 2, targetReps: '10-12' },
         ],
       },
     ],
   },
 ];
 
+interface PersistedRoutines {
+  splits: Split[];
+  activeSplitId: string | null;
+  lastStarted: Record<string, number>;
+}
+
 interface RoutineState {
   splits: Split[];
   pendingDay: RoutineDay | null;
+  activeSplitId: string | null;
+  lastStarted: Record<string, number>; // dayId → timestamp
 
   loadFromStorage: () => Promise<void>;
   addSplit: (name: string) => Promise<Split>;
@@ -119,111 +127,135 @@ interface RoutineState {
   removeExercise: (splitId: string, dayId: string, exName: string) => Promise<void>;
   updateExercise: (splitId: string, dayId: string, exName: string, updates: Partial<RoutineExercise>) => Promise<void>;
   setPendingDay: (day: RoutineDay | null) => void;
+  setActiveSplit: (splitId: string | null) => Promise<void>;
 }
 
-async function persist(splits: Split[]) {
-  await storageSet(STORAGE_KEYS.routines, splits);
+function snapshot(get: () => RoutineState): PersistedRoutines {
+  const { splits, activeSplitId, lastStarted } = get();
+  return { splits, activeSplitId, lastStarted };
+}
+
+async function save(get: () => RoutineState) {
+  await storageSet(STORAGE_KEYS.routines, snapshot(get));
 }
 
 export const useRoutineStore = create<RoutineState>((set, get) => ({
   splits: [],
   pendingDay: null,
+  activeSplitId: null,
+  lastStarted: {},
 
   loadFromStorage: async () => {
-    const stored = await storageGet<Split[]>(STORAGE_KEYS.routines);
-    // Merge: keep user splits, keep defaults that user hasn't deleted
-    if (!stored) {
-      set({ splits: DEFAULT_SPLITS });
-      await persist(DEFAULT_SPLITS);
+    const raw = await storageGet<Split[] | PersistedRoutines>(STORAGE_KEYS.routines);
+    if (!raw) {
+      const data: PersistedRoutines = { splits: DEFAULT_SPLITS, activeSplitId: null, lastStarted: {} };
+      set(data);
+      await storageSet(STORAGE_KEYS.routines, data);
       return;
     }
-    // If user already has data: use it (they may have deleted defaults intentionally)
-    set({ splits: stored.length > 0 ? stored : DEFAULT_SPLITS });
+    // Migrate old plain-array format
+    if (Array.isArray(raw)) {
+      const data: PersistedRoutines = {
+        splits: raw.length > 0 ? raw : DEFAULT_SPLITS,
+        activeSplitId: null,
+        lastStarted: {},
+      };
+      set(data);
+      await storageSet(STORAGE_KEYS.routines, data);
+      return;
+    }
+    set({
+      splits: raw.splits.length > 0 ? raw.splits : DEFAULT_SPLITS,
+      activeSplitId: raw.activeSplitId ?? null,
+      lastStarted: raw.lastStarted ?? {},
+    });
   },
 
   addSplit: async (name) => {
-    const split: Split = {
-      id: `split_${Date.now()}`,
-      name,
-      days: [],
-      createdAt: Date.now(),
-    };
-    const updated = [...get().splits, split];
-    set({ splits: updated });
-    await persist(updated);
+    const split: Split = { id: `split_${Date.now()}`, name, days: [], createdAt: Date.now() };
+    set({ splits: [...get().splits, split] });
+    await save(get);
     return split;
   },
 
   deleteSplit: async (splitId) => {
-    const updated = get().splits.filter((s) => s.id !== splitId);
-    set({ splits: updated });
-    await persist(updated);
+    const activeSplitId = get().activeSplitId === splitId ? null : get().activeSplitId;
+    set({ splits: get().splits.filter((s) => s.id !== splitId), activeSplitId });
+    await save(get);
   },
 
   addDay: async (splitId, name) => {
-    const day: RoutineDay = {
-      id: `day_${Date.now()}`,
-      name,
-      exercises: [],
-    };
-    const updated = get().splits.map((s) =>
-      s.id !== splitId ? s : { ...s, days: [...s.days, day] }
-    );
-    set({ splits: updated });
-    await persist(updated);
+    const day: RoutineDay = { id: `day_${Date.now()}`, name, exercises: [] };
+    set({ splits: get().splits.map((s) => s.id !== splitId ? s : { ...s, days: [...s.days, day] }) });
+    await save(get);
   },
 
   deleteDay: async (splitId, dayId) => {
-    const updated = get().splits.map((s) =>
-      s.id !== splitId ? s : { ...s, days: s.days.filter((d) => d.id !== dayId) }
-    );
-    set({ splits: updated });
-    await persist(updated);
+    set({
+      splits: get().splits.map((s) =>
+        s.id !== splitId ? s : { ...s, days: s.days.filter((d) => d.id !== dayId) }
+      ),
+    });
+    await save(get);
   },
 
   addExercise: async (splitId, dayId, ex) => {
-    const updated = get().splits.map((s) =>
-      s.id !== splitId ? s : {
-        ...s,
-        days: s.days.map((d) =>
-          d.id !== dayId ? d : { ...d, exercises: [...d.exercises, ex] }
-        ),
-      }
-    );
-    set({ splits: updated });
-    await persist(updated);
+    set({
+      splits: get().splits.map((s) =>
+        s.id !== splitId ? s : {
+          ...s,
+          days: s.days.map((d) =>
+            d.id !== dayId ? d : { ...d, exercises: [...d.exercises, ex] }
+          ),
+        }
+      ),
+    });
+    await save(get);
   },
 
   removeExercise: async (splitId, dayId, exName) => {
-    const updated = get().splits.map((s) =>
-      s.id !== splitId ? s : {
-        ...s,
-        days: s.days.map((d) =>
-          d.id !== dayId ? d : { ...d, exercises: d.exercises.filter((e) => e.name !== exName) }
-        ),
-      }
-    );
-    set({ splits: updated });
-    await persist(updated);
+    set({
+      splits: get().splits.map((s) =>
+        s.id !== splitId ? s : {
+          ...s,
+          days: s.days.map((d) =>
+            d.id !== dayId ? d : { ...d, exercises: d.exercises.filter((e) => e.name !== exName) }
+          ),
+        }
+      ),
+    });
+    await save(get);
   },
 
   updateExercise: async (splitId, dayId, exName, updates) => {
-    const updated = get().splits.map((s) =>
-      s.id !== splitId ? s : {
-        ...s,
-        days: s.days.map((d) =>
-          d.id !== dayId ? d : {
-            ...d,
-            exercises: d.exercises.map((e) =>
-              e.name !== exName ? e : { ...e, ...updates }
-            ),
-          }
-        ),
-      }
-    );
-    set({ splits: updated });
-    await persist(updated);
+    set({
+      splits: get().splits.map((s) =>
+        s.id !== splitId ? s : {
+          ...s,
+          days: s.days.map((d) =>
+            d.id !== dayId ? d : {
+              ...d,
+              exercises: d.exercises.map((e) => e.name !== exName ? e : { ...e, ...updates }),
+            }
+          ),
+        }
+      ),
+    });
+    await save(get);
   },
 
-  setPendingDay: (day) => set({ pendingDay: day }),
+  setPendingDay: (day) => {
+    if (day) {
+      const lastStarted = { ...get().lastStarted, [day.id]: Date.now() };
+      set({ pendingDay: day, lastStarted });
+      save(get);
+    } else {
+      set({ pendingDay: null });
+    }
+  },
+
+  setActiveSplit: async (splitId) => {
+    set({ activeSplitId: splitId });
+    await save(get);
+  },
 }));
