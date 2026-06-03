@@ -837,7 +837,7 @@ function InfoSheet({
                   </BrutlText>
                 </TouchableOpacity>
                 {dbError && (
-                  <BrutlText style={{ fontSize: 11, color: BrutlColors.error ?? '#FF4444', marginBottom: BrutlSpacing.md, textAlign: 'center' }}>
+                  <BrutlText style={{ fontSize: 11, color: '#FF4444', marginBottom: BrutlSpacing.md, textAlign: 'center' }}>
                     {dbError}
                   </BrutlText>
                 )}
