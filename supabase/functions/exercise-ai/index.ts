@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
       'X-Title': 'BRUTL',
     },
     body: JSON.stringify({
-      model: 'nvidia/llama-3.1-nemotron-ultra-253b-v1:free',
+      model: 'openrouter/owl-alpha',
       max_tokens: 512,
       messages: [
         { role: 'system', content: SYSTEM },
