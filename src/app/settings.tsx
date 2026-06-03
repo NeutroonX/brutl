@@ -13,7 +13,21 @@ import { BrutlColors, BrutlFonts, BrutlRadius, BrutlSpacing } from '@/constants/
 import { useUserStore, buildUserProfile } from '@/stores/user.store';
 import { useWatchStore } from '@/stores/watch.store';
 import { storageRemove, STORAGE_KEYS } from '@/lib/storage';
-import type { Goal, WeakArea } from '@/types';
+import type { ActivityLevel, Gender, Goal, WeakArea } from '@/types';
+
+const GENDERS: { value: Gender; label: string }[] = [
+  { value: 'MALE', label: 'Male' },
+  { value: 'FEMALE', label: 'Female' },
+  { value: 'OTHER', label: 'Other' },
+];
+
+const ACTIVITY_LEVELS: { value: ActivityLevel; label: string }[] = [
+  { value: 'SEDENTARY',   label: 'Sedentary' },
+  { value: 'LIGHT',       label: 'Light' },
+  { value: 'MODERATE',    label: 'Moderate' },
+  { value: 'ACTIVE',      label: 'Active' },
+  { value: 'VERY_ACTIVE', label: 'Very Active' },
+];
 
 const GOALS: { value: Goal; label: string }[] = [
   { value: 'FAT_LOSS', label: 'Fat Loss' },
@@ -126,6 +140,8 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
   const [name, setName] = useState(profile?.name ?? '');
   const [weightKg, setWeightKg] = useState(String(profile?.weightKg ?? ''));
   const [heightCm, setHeightCm] = useState(String(profile?.heightCm ?? ''));
+  const [gender, setGender] = useState<Gender>(profile?.gender ?? 'MALE');
+  const [activityLevel, setActivityLevel] = useState<ActivityLevel>(profile?.activityLevel ?? 'MODERATE');
   const [goal, setGoal] = useState<Goal>(profile?.goal ?? 'FAT_LOSS');
   const [weakAreas, setWeakAreas] = useState<WeakArea[]>(
     Array.isArray(profile?.weakArea) ? profile.weakArea : profile?.weakArea ? [profile.weakArea as WeakArea] : ['DIET']
@@ -138,14 +154,16 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
     const newWeightKg = parseFloat(weightKg) || profile.weightKg;
     const newHeightCm = parseInt(heightCm) || profile.heightCm;
     // Recalculate macro targets if weight or goal changed
-    const macroTargets = (newWeightKg !== profile.weightKg || goal !== profile.goal)
-      ? buildUserProfile({ name: name.trim(), age: profile.age, weightKg: newWeightKg, heightCm: newHeightCm, goal, weakArea: weakAreas }).macroTargets
+    const macroTargets = (newWeightKg !== profile.weightKg || goal !== profile.goal || activityLevel !== profile.activityLevel || gender !== profile.gender)
+      ? buildUserProfile({ name: name.trim(), age: profile.age, weightKg: newWeightKg, heightCm: newHeightCm, gender, activityLevel, goal, weakArea: weakAreas }).macroTargets
       : profile.macroTargets;
     await setProfile({
       ...profile,
       name: name.trim(),
       weightKg: newWeightKg,
       heightCm: newHeightCm,
+      gender,
+      activityLevel,
       goal,
       weakArea: weakAreas,
       macroTargets,
@@ -178,6 +196,28 @@ function EditProfileModal({ visible, onClose }: { visible: boolean; onClose: () 
             <View style={{ flex: 1 }}>
               <BrutlText style={styles.fieldLabel}>HEIGHT (CM)</BrutlText>
               <TextInput style={styles.input} value={heightCm} onChangeText={setHeightCm} keyboardType="number-pad" placeholderTextColor={BrutlColors.textDisabled} />
+            </View>
+          </View>
+
+          <View>
+            <BrutlText style={styles.fieldLabel}>GENDER</BrutlText>
+            <View style={styles.optionRow}>
+              {GENDERS.map((g) => (
+                <TouchableOpacity key={g.value} style={[styles.option, gender === g.value && styles.optionSelected]} onPress={() => setGender(g.value)}>
+                  <BrutlText variant="caption">{g.label}</BrutlText>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View>
+            <BrutlText style={styles.fieldLabel}>ACTIVITY LEVEL</BrutlText>
+            <View style={styles.optionRow}>
+              {ACTIVITY_LEVELS.map((a) => (
+                <TouchableOpacity key={a.value} style={[styles.option, activityLevel === a.value && styles.optionSelected]} onPress={() => setActivityLevel(a.value)}>
+                  <BrutlText variant="caption">{a.label}</BrutlText>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
 

@@ -1,4 +1,6 @@
 export type Goal = 'FAT_LOSS' | 'MUSCLE_GAIN' | 'RECOMP';
+export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
+export type ActivityLevel = 'SEDENTARY' | 'LIGHT' | 'MODERATE' | 'ACTIVE' | 'VERY_ACTIVE';
 export type WeakArea = 'UPPER' | 'LOWER' | 'CARDIO' | 'DIET' | 'SLEEP' | 'MENTAL' | 'CONSISTENCY' | 'FLEXIBILITY';
 export type Rank = 'E' | 'D' | 'C' | 'B' | 'A' | 'S';
 export type RoastTrigger = 'APP_OPEN' | 'MISSED_WORKOUT' | 'OFF_PLAN' | 'WEAK_LIFT' | 'POOR_RECOVERY' | 'WORKOUT_COMPLETE' | 'MEAL_LOGGED';
@@ -11,6 +13,8 @@ export interface UserProfile {
   age: number;
   weightKg: number;
   heightCm: number;
+  gender: Gender;
+  activityLevel: ActivityLevel;
   goal: Goal;
   weakArea: WeakArea[];
   rank: Rank;

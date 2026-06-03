@@ -3,7 +3,52 @@ import { create } from 'zustand';
 import { STORAGE_KEYS, storageGet, storageSet } from '@/lib/storage';
 import { getRankFromXP } from '@/lib/rank';
 import { calcStreakBonus } from '@/lib/xp';
-import type { Goal, MacroTargets, Rank, UserProfile, WeakArea } from '@/types';
+import type { ActivityLevel, Gender, Goal, MacroTargets, Rank, UserProfile, WeakArea } from '@/types';
+
+// Mifflin-St Jeor BMR → TDEE → goal-adjusted macro targets
+// Research basis: Mifflin MQ et al. (1990), ACSM protein guidelines (1.6–2.2g/kg)
+export function calcMacroTargets(
+  weightKg: number,
+  heightCm: number,
+  age: number,
+  gender: Gender,
+  activity: ActivityLevel,
+  goal: Goal,
+): MacroTargets {
+  // BMR (Mifflin-St Jeor)
+  const base = 10 * weightKg + 6.25 * heightCm - 5 * age;
+  const bmr = gender === 'MALE' ? base + 5 : gender === 'FEMALE' ? base - 161 : base - 78;
+
+  // TDEE
+  const activityMultipliers: Record<ActivityLevel, number> = {
+    SEDENTARY: 1.2,
+    LIGHT: 1.375,
+    MODERATE: 1.55,
+    ACTIVE: 1.725,
+    VERY_ACTIVE: 1.9,
+  };
+  const tdee = Math.round(bmr * activityMultipliers[activity]);
+
+  // Calorie target
+  const calories =
+    goal === 'FAT_LOSS'    ? tdee - 500  :  // ~0.5 kg/week deficit
+    goal === 'MUSCLE_GAIN' ? tdee + 250  :  // lean bulk surplus
+    tdee;                                    // recomp = maintenance
+
+  // Protein: 2.2g/kg fat loss (preserve muscle), 1.8g/kg bulk, 2.0g/kg recomp
+  const proteinG =
+    goal === 'FAT_LOSS'    ? Math.round(weightKg * 2.2) :
+    goal === 'MUSCLE_GAIN' ? Math.round(weightKg * 1.8) :
+    Math.round(weightKg * 2.0);
+
+  // Fat: 0.9g/kg, min 20% of calories
+  const fatG = Math.max(Math.round(weightKg * 0.9), Math.round((calories * 0.2) / 9));
+
+  // Carbs: fill remainder
+  const carbsG = Math.max(0, Math.round((calories - proteinG * 4 - fatG * 9) / 4));
+
+  return { calories, proteinG, carbsG, fatG };
+}
 
 interface UserState {
   profile: UserProfile | null;
@@ -38,6 +83,8 @@ export function buildUserProfile(data: {
   age: number;
   weightKg: number;
   heightCm: number;
+  gender: Gender;
+  activityLevel: ActivityLevel;
   goal: Goal;
   weakArea: WeakArea[];
 }): UserProfile {
@@ -48,7 +95,7 @@ export function buildUserProfile(data: {
     xp: 0,
     streakDays: 0,
     lastActiveDate: null,
-    macroTargets: calcMacroTargets(data.weightKg, data.goal),
+    macroTargets: calcMacroTargets(data.weightKg, data.heightCm, data.age, data.gender, data.activityLevel, data.goal),
     createdAt: Date.now(),
   };
 }

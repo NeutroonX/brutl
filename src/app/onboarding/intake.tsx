@@ -15,7 +15,7 @@ import { BrutlCard } from '@/components/ui/BrutlCard';
 import { BrutlText } from '@/components/ui/BrutlText';
 import { BrutlColors, BrutlFonts, BrutlRadius, BrutlSpacing } from '@/constants/theme';
 import { buildUserProfile, useUserStore } from '@/stores/user.store';
-import type { Goal, WeakArea } from '@/types';
+import type { ActivityLevel, Gender, Goal, WeakArea } from '@/types';
 
 const REACTIONS: Record<string, string> = {
   name: 'Name noted. Own it.',
@@ -25,6 +25,20 @@ const REACTIONS: Record<string, string> = {
   goal: 'That\'s the target. No excuses now.',
   weakArea: 'Your weakest link. We\'re going straight at it.',
 };
+
+const GENDERS: { value: Gender; label: string }[] = [
+  { value: 'MALE', label: 'Male' },
+  { value: 'FEMALE', label: 'Female' },
+  { value: 'OTHER', label: 'Other' },
+];
+
+const ACTIVITY_LEVELS: { value: ActivityLevel; label: string; sub: string }[] = [
+  { value: 'SEDENTARY', label: 'Sedentary', sub: 'Desk job, no exercise' },
+  { value: 'LIGHT', label: 'Light', sub: '1–3 days/week' },
+  { value: 'MODERATE', label: 'Moderate', sub: '3–5 days/week' },
+  { value: 'ACTIVE', label: 'Active', sub: '6–7 days/week' },
+  { value: 'VERY_ACTIVE', label: 'Very Active', sub: 'Athlete / physical job' },
+];
 
 const GOALS: { value: Goal; label: string }[] = [
   { value: 'FAT_LOSS', label: 'Fat Loss' },
@@ -81,6 +95,8 @@ const styles = StyleSheet.create({
 export default function IntakeScreen() {
   const setProfile = useUserStore((s) => s.setProfile);
   const [form, setForm] = useState({ name: '', age: '', weightKg: '', heightCm: '' });
+  const [gender, setGender] = useState<Gender | null>(null);
+  const [activityLevel, setActivityLevel] = useState<ActivityLevel | null>(null);
   const [goal, setGoal] = useState<Goal | null>(null);
   const [weakAreas, setWeakAreas] = useState<WeakArea[]>([]);
   const [reactions, setReactions] = useState<Record<string, string>>({});
@@ -100,7 +116,7 @@ export default function IntakeScreen() {
   }
 
   function isValid() {
-    return form.name && form.age && form.weightKg && form.heightCm && goal && weakAreas.length > 0;
+    return form.name && form.age && form.weightKg && form.heightCm && gender && activityLevel && goal && weakAreas.length > 0;
   }
 
   async function handleContinue() {
@@ -110,11 +126,13 @@ export default function IntakeScreen() {
       age: parseInt(form.age),
       weightKg: parseFloat(form.weightKg),
       heightCm: parseInt(form.heightCm),
+      gender: gender!,
+      activityLevel: activityLevel!,
       goal: goal!,
       weakArea: weakAreas,
     });
     await setProfile(profile);
-    router.push('/onboarding/first-roast');
+    router.push('/onboarding/macro-review' as any);
   }
 
   return (
@@ -142,6 +160,39 @@ export default function IntakeScreen() {
             {!!reactions[field] && <BrutlText style={styles.reaction}>{reactions[field]}</BrutlText>}
           </View>
         ))}
+
+        <View style={styles.field}>
+          <BrutlText variant="caption" style={styles.label}>GENDER</BrutlText>
+          <View style={styles.optionRow}>
+            {GENDERS.map((g) => (
+              <TouchableOpacity
+                key={g.value}
+                style={[styles.option, gender === g.value && styles.optionSelected]}
+                onPress={() => { setGender(g.value); setReactions((r) => ({ ...r, gender: 'Noted.' })); }}
+              >
+                <BrutlText variant="body">{g.label}</BrutlText>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {!!reactions.gender && <BrutlText style={styles.reaction}>{reactions.gender}</BrutlText>}
+        </View>
+
+        <View style={styles.field}>
+          <BrutlText variant="caption" style={styles.label}>ACTIVITY LEVEL</BrutlText>
+          <View style={{ gap: BrutlSpacing.xs }}>
+            {ACTIVITY_LEVELS.map((a) => (
+              <TouchableOpacity
+                key={a.value}
+                style={[styles.option, activityLevel === a.value && styles.optionSelected, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
+                onPress={() => { setActivityLevel(a.value); setReactions((r) => ({ ...r, activity: 'Multiplier locked.' })); }}
+              >
+                <BrutlText variant="body">{a.label}</BrutlText>
+                <BrutlText variant="caption" style={{ color: activityLevel === a.value ? '#000' : BrutlColors.textDisabled }}>{a.sub}</BrutlText>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {!!reactions.activity && <BrutlText style={styles.reaction}>{reactions.activity}</BrutlText>}
+        </View>
 
         <View style={styles.field}>
           <BrutlText variant="caption" style={styles.label}>GOAL</BrutlText>
