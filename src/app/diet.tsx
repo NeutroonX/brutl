@@ -28,6 +28,8 @@ import type { MealEntry } from '@/types';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const WATER_BLUE = '#4A8FD4' as const;
+const CHIP_GAP = 10;
+const CHIP_PAD_H = 20;
 
 const MACRO_COLORS = {
   kcal:    '#E8E8E8',
@@ -393,13 +395,13 @@ const mc = StyleSheet.create({
   chip: {
     flex: 1,
     backgroundColor: BrutlColors.bgCard,
-    borderRadius: BrutlRadius.sm,
+    borderRadius: BrutlRadius.full,
     borderWidth: 1,
     borderColor: BrutlColors.borderVisible,
-    paddingHorizontal: 8,
-    paddingTop: 10,
-    paddingBottom: 18,
-    gap: 2,
+    paddingHorizontal: CHIP_PAD_H,
+    paddingTop: 12,
+    paddingBottom: 20,
+    gap: 1,
     overflow: 'hidden',
   },
   value: {
@@ -416,17 +418,17 @@ const mc = StyleSheet.create({
   },
   pct: {
     fontFamily: 'BebasNeue_400Regular',
-    fontSize: 13,
+    fontSize: 12,
     letterSpacing: 0.5,
   },
   barTrack: {
     position: 'absolute',
     bottom: 0, left: 0, right: 0,
-    height: 4,
-    backgroundColor: BrutlColors.border,
+    height: 3,
+    backgroundColor: BrutlColors.borderVisible,
   },
   barFill: {
-    height: 4,
+    height: 3,
   },
   label: {
     fontSize: 8,
@@ -556,7 +558,7 @@ export default function DietScreen() {
     const current = (todayLog?.totalProteinG ?? 0) + food.proteinG;
     const compliance = calcMacroCompliance(current, target);
     if (compliance < 0.85) {
-      streamRoast(buildRoastPayload('OFF_PLAN', profile.rank, profile.streakDays, null, null, compliance));
+      streamRoast(buildRoastPayload('OFF_PLAN', profile.rank, profile.streakDays, null, null, compliance)).catch(() => {});
     }
   }
 
@@ -653,21 +655,26 @@ export default function DietScreen() {
 
         {/* Water */}
         {(() => {
-          const BLUE = WATER_BLUE;
           const pct = Math.min(1, waterLimit > 0 ? waterMl / waterLimit : 0);
-          const color = pct >= 1 ? BrutlColors.success : BLUE;
+          const color = pct >= 1 ? BrutlColors.success : WATER_BLUE;
+          const pctInt = Math.round(pct * 100);
           return (
             <View style={st.waterCard}>
+              {/* Header row */}
               <View style={st.waterTop}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                   <Ionicons name="water-outline" size={13} color={color} />
                   <BrutlText style={[st.waterLabel, { color }]}>WATER</BrutlText>
                 </View>
-                <TouchableOpacity onPress={() => setWaterGoalOpen((v) => !v)} hitSlop={10} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <BrutlText style={st.waterGoalTxt}>{(waterLimit / 1000).toFixed(1)}L goal</BrutlText>
-                  <Ionicons name={waterGoalOpen ? 'chevron-up' : 'chevron-down'} size={11} color={BrutlColors.textDisabled} />
+                <TouchableOpacity onPress={() => setWaterGoalOpen((v) => !v)} hitSlop={10}>
+                  <View style={[st.waterGoalChip, { borderColor: color + '55' }]}>
+                    <BrutlText style={[st.waterGoalChipTxt, { color }]}>{(waterLimit / 1000).toFixed(1)}L goal</BrutlText>
+                    <Ionicons name={waterGoalOpen ? 'chevron-up' : 'chevron-down'} size={10} color={color + 'AA'} />
+                  </View>
                 </TouchableOpacity>
               </View>
+
+              {/* Goal editor */}
               {waterGoalOpen && (
                 <View style={st.waterGoalRow}>
                   <TouchableOpacity style={st.waterGoalBtn} onPress={() => { const n = Math.max(500, waterLimit - 250); setWaterLimit(n); saveWater(waterMl, n); }}>
@@ -679,22 +686,42 @@ export default function DietScreen() {
                   </TouchableOpacity>
                 </View>
               )}
+
+              {/* Body */}
               <View style={st.waterBody}>
-                <View style={{ flex: 1, gap: 4 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+                {/* Dominant number */}
+                <View style={{ flex: 1, gap: 6 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 5 }}>
                     <BrutlText style={[st.waterAmount, { color }]}>{waterMl}</BrutlText>
-                    <BrutlText style={st.waterUnit}>ml</BrutlText>
+                    <BrutlText style={st.waterUnit}>ml today</BrutlText>
                   </View>
-                  <View style={st.waterTrack}><View style={[st.waterFill, { width: `${Math.round(pct * 100)}%` as any, backgroundColor: color }]} /></View>
-                  <BrutlText style={st.waterSub}>{pct >= 1 ? 'Goal reached!' : `${waterLimit - waterMl}ml remaining`}</BrutlText>
+                  {/* Progress bar */}
+                  <View style={st.waterTrack}>
+                    <View style={[st.waterFill, { width: `${pctInt}%` as any, backgroundColor: color }]} />
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <BrutlText style={st.waterSub}>
+                      {pct >= 1 ? 'Goal reached!' : `${waterLimit - waterMl}ml left`}
+                    </BrutlText>
+                    <BrutlText style={[st.waterPct, { color }]}>{pctInt}%</BrutlText>
+                  </View>
                 </View>
-                <View style={{ flexDirection: 'row', gap: BrutlSpacing.xs }}>
-                  <TouchableOpacity style={st.waterBtn} onPress={() => { const n = Math.max(0, waterMl - 250); setWaterMl(n); saveWater(n, waterLimit); }}>
-                    <Ionicons name="remove" size={18} color={BrutlColors.textMuted} />
+
+                {/* Pill buttons */}
+                <View style={{ gap: 8 }}>
+                  <TouchableOpacity
+                    style={[st.waterPillBtn, { borderColor: color + '55', backgroundColor: color + '14' }]}
+                    onPress={() => { const n = waterMl + 250; setWaterMl(n); saveWater(n, waterLimit); }}
+                  >
+                    <Ionicons name="add" size={13} color={color} />
+                    <BrutlText style={[st.waterPillTxt, { color }]}>250</BrutlText>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[st.waterBtn, { borderColor: color + '55' }]} onPress={() => { const n = waterMl + 250; setWaterMl(n); saveWater(n, waterLimit); }}>
-                    <Ionicons name="add" size={20} color={color} />
-                    <BrutlText style={[st.waterBtnTxt, { color }]}>250ml</BrutlText>
+                  <TouchableOpacity
+                    style={[st.waterPillBtn, { borderColor: BrutlColors.borderVisible }]}
+                    onPress={() => { const n = Math.max(0, waterMl - 250); setWaterMl(n); saveWater(n, waterLimit); }}
+                  >
+                    <Ionicons name="remove" size={13} color={BrutlColors.textMuted} />
+                    <BrutlText style={[st.waterPillTxt, { color: BrutlColors.textMuted }]}>250</BrutlText>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -850,7 +877,7 @@ const st = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
-  chipsRow: { flexDirection: 'row', gap: BrutlSpacing.xs },
+  chipsRow: { flexDirection: 'row', gap: CHIP_GAP },
 
   section: { gap: BrutlSpacing.sm },
   sectionLabel: { fontSize: 11, color: BrutlColors.accent, letterSpacing: 1.5 },
@@ -913,19 +940,21 @@ const st = StyleSheet.create({
   mealMacros: { fontSize: 11, color: BrutlColors.textMuted },
   deleteBtn: { padding: 2 },
 
-  waterCard: { backgroundColor: BrutlColors.bgCard, borderRadius: BrutlRadius.md, borderWidth: 1, borderColor: BrutlColors.borderVisible, padding: BrutlSpacing.md, gap: BrutlSpacing.sm },
+  waterCard: { backgroundColor: BrutlColors.bgCard, borderRadius: BrutlRadius.md, borderWidth: 1, borderColor: BrutlColors.borderVisible, padding: BrutlSpacing.md, gap: BrutlSpacing.sm, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 }, android: { elevation: 3 } }) },
   waterTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   waterLabel: { fontSize: 11, letterSpacing: 1.5 },
-  waterGoalTxt: { fontSize: 10, color: BrutlColors.textDisabled },
+  waterGoalChip: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: BrutlRadius.full, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, backgroundColor: BrutlColors.bgCardSubtle },
+  waterGoalChipTxt: { fontSize: 10, letterSpacing: 0.5 },
   waterGoalRow: { flexDirection: 'row', alignItems: 'center', gap: BrutlSpacing.sm, paddingVertical: BrutlSpacing.xs },
   waterGoalBtn: { width: 32, height: 32, borderRadius: BrutlRadius.sm, borderWidth: 1, borderColor: BrutlColors.borderVisible, alignItems: 'center', justifyContent: 'center' },
   waterGoalVal: { fontFamily: BrutlFonts.mono, fontSize: 13, color: BrutlColors.textPrimary, minWidth: 64, textAlign: 'center' },
   waterBody: { flexDirection: 'row', alignItems: 'center', gap: BrutlSpacing.md },
-  waterAmount: { fontFamily: 'BebasNeue_400Regular', fontSize: 32, lineHeight: 34 },
-  waterUnit: { fontSize: 11, color: BrutlColors.textMuted, marginBottom: 4 },
-  waterTrack: { height: 3, backgroundColor: BrutlColors.border, borderRadius: 2, overflow: 'hidden' },
-  waterFill: { height: 3, borderRadius: 2 },
+  waterAmount: { fontFamily: 'BebasNeue_400Regular', fontSize: 48, lineHeight: 50 },
+  waterUnit: { fontSize: 11, color: BrutlColors.textMuted },
+  waterTrack: { height: 6, backgroundColor: BrutlColors.borderVisible, borderRadius: 3, overflow: 'hidden' },
+  waterFill: { height: 6, borderRadius: 3 },
   waterSub: { fontSize: 10, color: BrutlColors.textDisabled },
-  waterBtn: { width: 48, height: 48, borderRadius: BrutlRadius.md, borderWidth: 1, borderColor: BrutlColors.borderVisible, backgroundColor: BrutlColors.bg, alignItems: 'center', justifyContent: 'center', gap: 2 },
-  waterBtnTxt: { fontSize: 9, letterSpacing: 0.5 },
+  waterPct: { fontFamily: 'BebasNeue_400Regular', fontSize: 13, letterSpacing: 0.5 },
+  waterPillBtn: { borderRadius: BrutlRadius.full, height: 36, paddingHorizontal: 14, borderWidth: 1, backgroundColor: BrutlColors.bg, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4 },
+  waterPillTxt: { fontFamily: BrutlFonts.mono, fontSize: 11 },
 });

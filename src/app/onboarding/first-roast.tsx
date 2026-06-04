@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { BrutlButton } from '@/components/ui/BrutlButton';
@@ -12,6 +12,16 @@ import { buildRoastPayload, streamRoast } from '@/lib/roast-engine';
 import { RANK_TITLES } from '@/lib/rank';
 import { useRoastStore } from '@/stores/roast.store';
 import { useUserStore } from '@/stores/user.store';
+import type { Rank } from '@/types';
+
+const RANK_ROASTS: Record<Rank, string> = {
+  E: "Zero macros tracked. Zero effort logged. The couch is impressed — nobody else is.",
+  D: "Barely showing up counts, technically. Keep that energy and you might graduate from tragic to mediocre.",
+  C: "Middle of the pack. Not terrible enough to laugh at, not good enough to respect. Fix that.",
+  B: "Almost dangerous. You've got the base — now stop coasting and actually push.",
+  A: "You know what you're doing. Now stop knowing and start dominating.",
+  S: "Elite tier. Clean data, locked diet, zero excuses. Don't go soft on us now.",
+};
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BrutlColors.bg },
@@ -28,11 +38,14 @@ export default function FirstRoastScreen() {
   const profile = useUserStore((s) => s.profile);
   const setHasOnboarded = useUserStore((s) => s.setHasOnboarded);
   const { currentRoast, correctionText, isStreaming } = useRoastStore();
+  const didStream = useRef(false);
+
   useEffect(() => {
-    if (!profile) return;
+    if (!profile || didStream.current) return;
+    didStream.current = true;
     const payload = buildRoastPayload('APP_OPEN', profile.rank, profile.streakDays);
     streamRoast(payload).catch(() => {});
-  }, []);
+  }, [profile]);
 
   async function handleBegin() {
     await setHasOnboarded(true);
@@ -57,22 +70,20 @@ export default function FirstRoastScreen() {
           </View>
         </BrutlCard>
 
-        {!!(currentRoast || isStreaming) && (
-          <BrutlCard>
-            <View style={styles.roastBox}>
-              <BrutlText variant="caption" style={{ color: BrutlColors.accent }}>
-                FIRST ROAST
-              </BrutlText>
-              <BrutlText variant="body">
-                {currentRoast}
-                {isStreaming && <BrutlText style={styles.cursor}>|</BrutlText>}
-              </BrutlText>
-              {!!correctionText && !isStreaming && (
-                <BrutlText variant="accent">→ {correctionText}</BrutlText>
-              )}
-            </View>
-          </BrutlCard>
-        )}
+        <BrutlCard>
+          <View style={styles.roastBox}>
+            <BrutlText variant="caption" style={{ color: BrutlColors.accent }}>
+              FIRST ROAST
+            </BrutlText>
+            <BrutlText variant="body">
+              {currentRoast || RANK_ROASTS[profile.rank]}
+              {isStreaming && <BrutlText style={styles.cursor}>|</BrutlText>}
+            </BrutlText>
+            {!!correctionText && !isStreaming && (
+              <BrutlText variant="accent">→ {correctionText}</BrutlText>
+            )}
+          </View>
+        </BrutlCard>
 
       </ScrollView>
 
