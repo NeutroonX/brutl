@@ -1,5 +1,11 @@
+import { z } from 'zod';
 import { useRoastStore } from '@/stores/roast.store';
 import type { Rank, RoastTrigger, WatchData, WorkoutLog } from '@/types';
+
+const SseEventSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('content_block_delta'), delta: z.object({ text: z.string() }) }),
+  z.object({ type: z.literal('correction'), text: z.string() }),
+]);
 
 export interface RoastPayload {
   triggerType: RoastTrigger;
@@ -94,17 +100,15 @@ export async function streamRoast(payload: RoastPayload): Promise<void> {
         if (line.startsWith('data: ')) {
           const data = line.slice(6);
           if (data === '[DONE]') break;
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.type === 'content_block_delta') {
-              const raw = parsed.delta?.text ?? '';
-              const clean = raw.replace(/\*\*/g, '').replace(/^[-•]\s/gm, '');
-              store.appendStreamChunk(clean);
-            } else if (parsed.type === 'correction') {
-              correction = parsed.text ?? '';
-            }
-          } catch {
-            // non-JSON SSE line, skip
+          const result = SseEventSchema.safeParse(
+            (() => { try { return JSON.parse(data); } catch { return null; } })()
+          );
+          if (!result.success) continue;
+          if (result.data.type === 'content_block_delta') {
+            const clean = result.data.delta.text.replace(/\*\*/g, '').replace(/^[-•]\s/gm, '');
+            store.appendStreamChunk(clean);
+          } else if (result.data.type === 'correction') {
+            correction = result.data.text;
           }
         }
       }

@@ -1,8 +1,8 @@
 import { Alert } from 'react-native';
 import { STORAGE_KEYS, storageGet, storageSet } from '@/lib/storage';
-import { getApiKey } from '@/lib/api-keys';
 
-const BASE_URL = 'https://exercisedb.p.rapidapi.com';
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+const SUPABASE_ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
 const DAILY_LIMIT = 35;
 const DAILY_WARN = 30;
@@ -86,19 +86,20 @@ async function canRequest(): Promise<boolean> {
 
 // ─── API fetch ────────────────────────────────────────────────────────────────
 
-async function apiFetch<T>(path: string): Promise<T | null> {
+async function apiFetch<T>(query: string): Promise<T | null> {
   const allowed = await canRequest();
   if (!allowed) return null;
   try {
-    const res = await fetch(`${BASE_URL}${path}`, {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/exercise-db`, {
+      method: 'POST',
       headers: {
-        'x-rapidapi-host': 'exercisedb.p.rapidapi.com',
-        'x-rapidapi-key': getApiKey('RAPID_API_KEY', process.env.EXPO_PUBLIC_RAPID_API_KEY ?? ''),
         'Content-Type': 'application/json',
+        Authorization: `Bearer ${SUPABASE_ANON}`,
       },
+      body: JSON.stringify({ query }),
     });
     if (!res.ok) {
-      console.error(`[ExerciseDB] ${res.status} ${res.statusText} — ${path}`);
+      console.error(`[ExerciseDB] ${res.status} ${res.statusText}`);
       return null;
     }
     return (await res.json()) as T;
@@ -118,9 +119,7 @@ export async function searchExerciseDB(query: string): Promise<ExerciseDBEntry[]
   const key = query.toLowerCase().trim();
   if (queryCache.has(key)) return queryCache.get(key)!;
 
-  const results = await apiFetch<ExerciseDBEntry[]>(
-    `/exercises/name/${encodeURIComponent(key)}?limit=20`
-  );
+  const results = await apiFetch<ExerciseDBEntry[]>(key);
   if (!results) return [];
 
   cacheEntries(results);

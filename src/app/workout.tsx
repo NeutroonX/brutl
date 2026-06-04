@@ -28,6 +28,7 @@ import { BrutlText } from '@/components/ui/BrutlText';
 import { XPToast, useXPToast } from '@/components/ui/XPToast';
 import { BrutlColors, BrutlFonts, BrutlRadius, BrutlSpacing } from '@/constants/theme';
 import { buildRoastPayload, streamRoast } from '@/lib/roast-engine';
+import { z } from 'zod';
 import {
   detectSplitName,
   getExerciseProfile,
@@ -39,6 +40,16 @@ import {
   getSuggestedExercises,
   cacheExerciseProfile,
 } from '@/lib/workout-ai';
+
+const ExerciseAIResponseSchema = z.object({
+  muscles: z.array(z.object({
+    name: z.string(),
+    activationPct: z.number(),
+    tier: z.enum(['primary', 'secondary', 'tertiary', 'stabilizer']),
+  })).min(1),
+  formCues: z.array(z.string()).min(1),
+  hypertrophy: z.object({ repRange: z.string(), sets: z.string(), rir: z.string(), tempo: z.string() }),
+});
 import { calcWorkoutXP } from '@/lib/xp';
 import { useRoutineStore } from '@/stores/routine.store';
 import { useUserStore } from '@/stores/user.store';
@@ -99,8 +110,8 @@ function ExercisePicker({
           body: JSON.stringify({ exercise: trimmed }),
         });
         if (res.ok) {
-          const profile = await res.json();
-          if (profile?.muscles) { cacheExerciseProfile(trimmed, profile); setAiResult({ name: trimmed }); }
+          const parsed = ExerciseAIResponseSchema.safeParse(await res.json());
+          if (parsed.success) { cacheExerciseProfile(trimmed, parsed.data); setAiResult({ name: trimmed }); }
         }
       } catch {}
       setAiLoading(false);
