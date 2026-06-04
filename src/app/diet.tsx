@@ -16,7 +16,6 @@ import { BrutlCard } from '@/components/ui/BrutlCard';
 import { BrutlText } from '@/components/ui/BrutlText';
 import { BarcodeScanModal, type ScannedFood } from '@/components/BarcodeScanModal';
 import { DietPhaseBadge } from '@/components/DietPhaseBadge';
-import { MealPlanCard } from '@/components/MealPlanCard';
 import { PhaseEditorSheet } from '@/components/PhaseEditorSheet';
 import { PhotoScanModal } from '@/components/PhotoScanModal';
 import { ScanConfirmSheet } from '@/components/ScanConfirmSheet';
@@ -630,7 +629,6 @@ export default function DietScreen() {
         onToggleFav={toggleFavourite}
       />
       <PhaseEditorSheet
-        key={activePhase?.id ?? 'none'}
         visible={showPhaseEditor}
         currentPhase={activePhase ?? null}
         profile={profile ?? null}
@@ -731,11 +729,6 @@ export default function DietScreen() {
             </View>
           );
         })()}
-
-        {/* AI Meal Plan */}
-        {activePhase && profile && (
-          <MealPlanCard phase={activePhase} userId={profile.id} />
-        )}
 
         {/* Search */}
         <View style={st.section}>

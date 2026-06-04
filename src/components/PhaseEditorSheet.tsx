@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -66,6 +66,15 @@ export function PhaseEditorSheet({
   const [selectedCycleLabel, setSelectedCycleLabel] = useState(() => findCycleLabel(currentPhase));
 
   const { mutate, isPending } = useSetDietPhase();
+
+  // Sync local selections to currentPhase each time the sheet opens so it
+  // always reflects the latest saved phase without needing a key-based remount.
+  useEffect(() => {
+    if (visible) {
+      setSelectedPhase(currentPhase?.phase ?? 'MAINTAIN');
+      setSelectedCycleLabel(findCycleLabel(currentPhase));
+    }
+  }, [visible]);
 
   const goalMap = { BULK: 'MUSCLE_GAIN', CUT: 'FAT_LOSS', MAINTAIN: 'RECOMP' } as const;
   const previewMacros = useMemo(() => {
