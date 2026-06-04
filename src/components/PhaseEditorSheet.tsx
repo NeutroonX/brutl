@@ -82,17 +82,18 @@ export function PhaseEditorSheet({
     const cyclePattern = CYCLE_OPTIONS.find((c) => c.label === selectedCycleLabel)?.pattern
       ?? CYCLE_OPTIONS[0].pattern;
 
-    mutate(
-      {
-        userId: profile.id,
-        phase: selectedPhase,
-        startDate: new Date().toISOString().split('T')[0],
-        endDate: null,
-        macroTargets: previewMacros,
-        cyclePattern,
-      },
-      { onSuccess: onClose },
-    );
+    // Dismiss first so the key-change from the optimistic update doesn't remount
+    // the Modal mid-animation and cause a visual glitch.
+    onClose();
+
+    mutate({
+      userId: profile.id,
+      phase: selectedPhase,
+      startDate: new Date().toISOString().split('T')[0],
+      endDate: null,
+      macroTargets: previewMacros,
+      cyclePattern,
+    });
   }
 
   return (
