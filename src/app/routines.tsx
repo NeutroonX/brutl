@@ -426,10 +426,15 @@ export default function RoutinesScreen() {
     <View style={s.container}>
       <View style={[s.header, { paddingTop: insets.top + BrutlSpacing.sm }]}>
         <BrutlText style={s.title}>Routines</BrutlText>
-        <TouchableOpacity onPress={() => setCreating(true)} style={s.newBtn}>
-          <Ionicons name="add" size={14} color="#fff" />
-          <BrutlText style={s.newBtnTxt}>NEW SPLIT</BrutlText>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: BrutlSpacing.sm }}>
+          <TouchableOpacity onPress={() => setShowGymCamera(true)} style={s.cameraBtn}>
+            <Ionicons name="camera" size={18} color={BrutlColors.accent} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setCreating(true)} style={s.newBtn}>
+            <Ionicons name="add" size={14} color="#fff" />
+            <BrutlText style={s.newBtnTxt}>NEW SPLIT</BrutlText>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -513,6 +518,12 @@ const s = StyleSheet.create({
     borderBottomWidth: 0.5, borderBottomColor: BrutlColors.border,
   },
   title: { fontFamily: BrutlFonts.display, fontSize: 28, color: BrutlColors.textPrimary, letterSpacing: 1 },
+  cameraBtn: {
+    width: 36, height: 36, borderRadius: BrutlRadius.sm,
+    borderWidth: 1, borderColor: `${BrutlColors.accent}50`,
+    backgroundColor: `${BrutlColors.accent}12`,
+    alignItems: 'center', justifyContent: 'center',
+  },
   newBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: BrutlColors.accent, paddingHorizontal: BrutlSpacing.md, paddingVertical: 7,
