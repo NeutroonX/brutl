@@ -361,21 +361,32 @@ const ma = StyleSheet.create({
 
 // ─── MacroChip (Option E) ─────────────────────────────────────────────────────
 
-function MacroChip({ label, value, target, color }: {
+function MacroChip({ label, value, target, unit, color }: {
   label: string; value: number; target: number; unit: string; color: string;
 }) {
   const pct = target > 0 ? Math.min(1, value / target) : 0;
-  const filled = value > 0;
+  const over = pct >= 1;
+  const activeColor = over ? BrutlColors.success : color;
+  const pctInt = Math.round(pct * 100);
 
   return (
     <View style={mc.chip}>
-      <BrutlText style={mc.label}>{label}</BrutlText>
-      <BrutlText style={[mc.value, { color: filled ? BrutlColors.textPrimary : BrutlColors.textDisabled }]}>
+      <BrutlText style={[mc.value, { color: value > 0 ? (over ? BrutlColors.success : BrutlColors.textPrimary) : BrutlColors.textDisabled }]}>
         {Math.round(value)}
       </BrutlText>
+      <BrutlText style={mc.unit}>{unit}</BrutlText>
+      <BrutlText style={[mc.pct, { color: pct > 0 ? activeColor : BrutlColors.textDisabled }]}>
+        {target > 0 ? `${pctInt}%` : '—'}
+      </BrutlText>
       <View style={mc.barTrack}>
-        <View style={[mc.barFill, { width: `${Math.round(Math.min(1, pct) * 100)}%` as any, backgroundColor: color }]} />
+        <View style={[mc.barFill, {
+          width: `${Math.min(100, pctInt)}%` as any,
+          backgroundColor: activeColor,
+        }]} />
       </View>
+      <BrutlText style={[mc.label, { color: pct > 0 ? activeColor : BrutlColors.textDisabled }]}>
+        {label}
+      </BrutlText>
     </View>
   );
 }
@@ -386,32 +397,43 @@ const mc = StyleSheet.create({
     backgroundColor: BrutlColors.bgCard,
     borderRadius: BrutlRadius.full,
     borderWidth: 1,
-    borderColor: BrutlColors.border,
+    borderColor: BrutlColors.borderVisible,
     paddingHorizontal: CHIP_PAD_H,
-    paddingTop: 10,
-    paddingBottom: 16,
-    gap: 2,
+    paddingTop: 12,
+    paddingBottom: 20,
+    gap: 1,
     overflow: 'hidden',
-  },
-  label: {
-    fontSize: 8,
-    color: BrutlColors.textDisabled,
-    letterSpacing: 1.2,
   },
   value: {
     fontFamily: 'BebasNeue_400Regular',
-    fontSize: 24,
-    lineHeight: 26,
+    fontSize: 26,
+    lineHeight: 28,
+    letterSpacing: 0.5,
+  },
+  unit: {
+    fontSize: 9,
+    color: BrutlColors.textMuted,
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  pct: {
+    fontFamily: 'BebasNeue_400Regular',
+    fontSize: 12,
     letterSpacing: 0.5,
   },
   barTrack: {
     position: 'absolute',
     bottom: 0, left: 0, right: 0,
-    height: 2,
-    backgroundColor: BrutlColors.border,
+    height: 3,
+    backgroundColor: BrutlColors.borderVisible,
   },
   barFill: {
-    height: 2,
+    height: 3,
+  },
+  label: {
+    fontSize: 8,
+    letterSpacing: 1.2,
+    marginTop: 1,
   },
 });
 
