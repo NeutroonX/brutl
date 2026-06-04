@@ -1,3 +1,5 @@
+import { z } from 'npm:zod';
+
 const GEMINI_KEY = Deno.env.get('GEMINI_API_KEY') ?? '';
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_KEY}`;
 
@@ -5,6 +7,15 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+const MacrosSchema = z.object({
+  name: z.string().max(80),
+  calories: z.number().min(0).max(9999),
+  proteinG: z.number().min(0).max(999),
+  carbsG: z.number().min(0).max(999),
+  fatG: z.number().min(0).max(999),
+  servingG: z.number().min(0).max(9999),
+});
 
 const PROMPT = `Look at this meal photo and estimate the nutritional content for the full portion visible.
 
@@ -64,8 +75,14 @@ Deno.serve(async (req) => {
       });
     }
 
-    const macros = JSON.parse(jsonMatch[0]);
-    return new Response(JSON.stringify(macros), {
+    const parsed = MacrosSchema.safeParse(JSON.parse(jsonMatch[0]));
+    if (!parsed.success) {
+      return new Response(JSON.stringify({ error: 'Invalid AI response shape' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response(JSON.stringify(parsed.data), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err) {

@@ -724,13 +724,13 @@ export default function SettingsScreen() {
                 name: 'RAPID_API_KEY' as ApiKeyName,
                 label: 'RapidAPI — Exercise DB',
                 icon: 'key-outline',
-                envDefault: process.env.EXPO_PUBLIC_RAPID_API_KEY ?? '',
+                envDefault: '',
               },
               {
                 name: 'USDA_API_KEY' as ApiKeyName,
                 label: 'USDA — Food Database',
                 icon: 'leaf-outline',
-                envDefault: process.env.EXPO_PUBLIC_USDA_API_KEY ?? '',
+                envDefault: '',
               },
               {
                 name: 'SUPABASE_ANON_KEY' as ApiKeyName,

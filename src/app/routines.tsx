@@ -13,6 +13,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrutlText } from '@/components/ui/BrutlText';
+import { GymCameraModal } from '@/components/GymCameraModal';
 import { BrutlColors, BrutlFonts, BrutlRadius, BrutlSpacing } from '@/constants/theme';
 import { searchExercises, getSuggestedExercises } from '@/lib/workout-ai';
 import { useRoutineStore } from '@/stores/routine.store';
@@ -407,6 +408,7 @@ export default function RoutinesScreen() {
   const insets = useSafeAreaInsets();
   const [creating, setCreating] = useState(false);
   const [newSplitName, setNewSplitName] = useState('');
+  const [showGymCamera, setShowGymCamera] = useState(false);
 
   // Active split first
   const sorted = [...splits].sort((a, b) =>
@@ -452,7 +454,23 @@ export default function RoutinesScreen() {
             />
           ))
         )}
+
+        {/* Gym Shot */}
+        <TouchableOpacity style={s.gymShotCard} onPress={() => setShowGymCamera(true)} activeOpacity={0.75}>
+          <View style={s.gymShotLeft}>
+            <View style={s.gymShotIconBox}>
+              <Ionicons name="camera" size={22} color={BrutlColors.accent} />
+            </View>
+            <View style={s.gymShotText}>
+              <BrutlText style={s.gymShotTitle}>GYM SHOT</BrutlText>
+              <BrutlText style={s.gymShotSub}>CAPTURE YOUR PROGRESS</BrutlText>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={BrutlColors.textDisabled} />
+        </TouchableOpacity>
       </ScrollView>
+
+      <GymCameraModal visible={showGymCamera} onClose={() => setShowGymCamera(false)} />
 
       <Modal transparent animationType="fade" visible={creating} onRequestClose={() => setCreating(false)}>
         <View style={s.modalBg}>
@@ -503,6 +521,23 @@ const s = StyleSheet.create({
   newBtnTxt: { fontFamily: BrutlFonts.display, fontSize: 11, color: '#fff', letterSpacing: 1 },
   scroll: { flex: 1 },
   content: { padding: BrutlSpacing.xl, gap: BrutlSpacing.lg },
+
+  gymShotCard: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: BrutlColors.bgCard, borderRadius: BrutlRadius.md,
+    borderWidth: 1, borderColor: BrutlColors.borderVisible,
+    padding: BrutlSpacing.md,
+  },
+  gymShotLeft: { flexDirection: 'row', alignItems: 'center', gap: BrutlSpacing.md },
+  gymShotIconBox: {
+    width: 44, height: 44, borderRadius: BrutlRadius.sm,
+    backgroundColor: `${BrutlColors.accent}18`,
+    borderWidth: 1, borderColor: `${BrutlColors.accent}40`,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  gymShotText: { gap: 2 },
+  gymShotTitle: { fontFamily: BrutlFonts.display, fontSize: 18, color: BrutlColors.textPrimary, letterSpacing: 1 },
+  gymShotSub: { fontSize: 10, color: BrutlColors.textDisabled, letterSpacing: 1.2 },
 
   empty: { paddingVertical: BrutlSpacing.xxl, alignItems: 'center', gap: BrutlSpacing.sm },
   emptyTitle: { fontFamily: BrutlFonts.display, fontSize: 20, color: BrutlColors.textMuted, letterSpacing: 0.5 },
