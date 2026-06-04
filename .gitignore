@@ -37,6 +37,9 @@ yarn-error.*
 # Claude Code
 .claude/
 .vscode/
+AGENTS.md
+CLAUDE.md
+BRUTL_dev_package/
 
 # typescript
 *.tsbuildinfo
