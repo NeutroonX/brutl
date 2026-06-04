@@ -15,16 +15,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { BrutlCard } from '@/components/ui/BrutlCard';
 import { BrutlText } from '@/components/ui/BrutlText';
 import { BarcodeScanModal, type ScannedFood } from '@/components/BarcodeScanModal';
-import { DietPhaseBadge } from '@/components/DietPhaseBadge';
-import { PhaseEditorSheet } from '@/components/PhaseEditorSheet';
 import { PhotoScanModal } from '@/components/PhotoScanModal';
 import { ScanConfirmSheet } from '@/components/ScanConfirmSheet';
 import { BrutlColors, BrutlFonts, BrutlRadius, BrutlSpacing } from '@/constants/theme';
-import { getEffectiveMacros, getTodayCycleDayType } from '@/lib/macro-cycling';
 import { buildRoastPayload, streamRoast } from '@/lib/roast-engine';
 import { STORAGE_KEYS, storageGet, storageSet } from '@/lib/storage';
 import { calcMacroCompliance } from '@/lib/xp';
-import { useDietPhase } from '@/repositories/diet-phase.repository';
 import { useDietStore } from '@/stores/diet.store';
 import { useUserStore } from '@/stores/user.store';
 import type { MealEntry } from '@/types';
@@ -479,8 +475,6 @@ const qt = StyleSheet.create({
 export default function DietScreen() {
   const profile = useUserStore((s) => s.profile);
   const { addMeal, removeMeal, todayLog, logs } = useDietStore();
-  const { data: activePhase } = useDietPhase(profile?.id);
-
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<MealEntry[]>([]);
   const [searching, setSearching] = useState(false);
@@ -489,7 +483,6 @@ export default function DietScreen() {
   const [showBarcode, setShowBarcode] = useState(false);
   const [showPhoto, setShowPhoto] = useState(false);
   const [showManual, setShowManual] = useState(false);
-  const [showPhaseEditor, setShowPhaseEditor] = useState(false);
   const [pendingScan, setPendingScan] = useState<ScannedFood | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -556,11 +549,10 @@ export default function DietScreen() {
 
   async function handleAdd(food: MealEntry) {
     if (!profile) return;
-    const effectiveTargets = activePhase ? getEffectiveMacros(activePhase) : profile.macroTargets;
-    await addMeal(food, effectiveTargets);
+    await addMeal(food, profile.macroTargets);
     setQuery('');
     setResults([]);
-    const target = effectiveTargets.proteinG;
+    const target = profile.macroTargets.proteinG;
     const current = (todayLog?.totalProteinG ?? 0) + food.proteinG;
     const compliance = calcMacroCompliance(current, target);
     if (compliance < 0.85) {
@@ -573,8 +565,7 @@ export default function DietScreen() {
     await handleAdd(food);
   }
 
-  const targets = activePhase ? getEffectiveMacros(activePhase) : profile?.macroTargets;
-  const todayDayType = activePhase ? getTodayCycleDayType(activePhase) : null;
+  const targets = profile?.macroTargets;
   const meals = todayLog?.meals ?? [];
   const hasMeals = meals.length > 0;
   const showSearch = query.trim().length > 0;
@@ -628,13 +619,6 @@ export default function DietScreen() {
         isFav={(food) => isFavourited(favourites, food)}
         onToggleFav={toggleFavourite}
       />
-      <PhaseEditorSheet
-        visible={showPhaseEditor}
-        currentPhase={activePhase ?? null}
-        profile={profile ?? null}
-        onClose={() => setShowPhaseEditor(false)}
-      />
-
       <ScrollView
         style={st.scroll}
         contentContainerStyle={st.content}
@@ -645,9 +629,6 @@ export default function DietScreen() {
         <View style={st.header}>
           <BrutlText style={st.title}>DIET LOG</BrutlText>
           <View style={st.headerIcons}>
-            <TouchableOpacity style={st.iconBtn} onPress={() => setShowPhaseEditor(true)} hitSlop={8}>
-              <Ionicons name="nutrition-outline" size={20} color={BrutlColors.textPrimary} />
-            </TouchableOpacity>
             <TouchableOpacity style={st.iconBtn} onPress={() => setShowManual(true)} hitSlop={8}>
               <Ionicons name="create-outline" size={20} color={BrutlColors.textPrimary} />
             </TouchableOpacity>
@@ -660,16 +641,7 @@ export default function DietScreen() {
           </View>
         </View>
 
-        {/* Diet Phase Badge */}
-        {activePhase && (
-          <DietPhaseBadge
-            phase={activePhase.phase}
-            dayType={todayDayType}
-            onPress={() => setShowPhaseEditor(true)}
-          />
-        )}
-
-        {/* Macro Chips — Option E */}
+        {/* Macro Chips */}
         {targets && (
           <View style={st.chipsRow}>
             <MacroChip value={todayLog?.totalCalories ?? 0} target={targets.calories} unit="KCAL" label="CALORIES" color={MACRO_COLORS.kcal} />
