@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Image,
   Modal,
   StyleSheet,
@@ -10,7 +9,6 @@ import {
 
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import * as MediaLibrary from 'expo-media-library';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrutlText } from '@/components/ui/BrutlText';
@@ -38,12 +36,9 @@ export function GymCameraModal({
   visible: boolean;
   onClose: () => void;
 }) {
-  const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions();
   const [state, setState] = useState<State>('idle');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [launching, setLaunching] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const insets = useSafeAreaInsets();
 
   const quip = useMemo(
@@ -69,7 +64,6 @@ export function GymCameraModal({
         const uri = result.assets[0].uri;
         setPhotoUri(uri);
         setState('preview');
-        saveToGallery(uri);
       } else {
         onClose();
       }
@@ -80,35 +74,14 @@ export function GymCameraModal({
     }
   }
 
-  async function saveToGallery(uri: string) {
-    setSaving(true);
-    try {
-      let granted = mediaPermission?.granted;
-      if (!granted) {
-        const { granted: g } = await requestMediaPermission();
-        granted = g;
-      }
-      if (granted) {
-        await MediaLibrary.saveToLibraryAsync(uri);
-        setSaved(true);
-      }
-    } catch {
-      // silent — photo still visible in preview
-    } finally {
-      setSaving(false);
-    }
-  }
-
   function retake() {
     setPhotoUri(null);
-    setSaved(false);
     setState('idle');
     launchCamera();
   }
 
   function handleClose() {
     setPhotoUri(null);
-    setSaved(false);
     setState('idle');
     onClose();
   }
@@ -171,18 +144,8 @@ export function GymCameraModal({
               <Ionicons name="close" size={20} color="rgba(255,255,255,0.9)" />
             </TouchableOpacity>
             <View style={gc.savedChip}>
-              {saving ? (
-                <ActivityIndicator size="small" color={BrutlColors.textMuted} />
-              ) : (
-                <Ionicons
-                  name={saved ? 'checkmark-circle' : 'ellipse-outline'}
-                  size={12}
-                  color={saved ? BrutlColors.success : BrutlColors.textDisabled}
-                />
-              )}
-              <BrutlText style={[gc.savedChipTxt, saved && { color: BrutlColors.success }]}>
-                {saving ? 'SAVING...' : saved ? 'SAVED' : 'NOT SAVED'}
-              </BrutlText>
+              <Ionicons name="checkmark-circle" size={12} color={BrutlColors.success} />
+              <BrutlText style={[gc.savedChipTxt, { color: BrutlColors.success }]}>SAVED TO GALLERY</BrutlText>
             </View>
           </View>
 
