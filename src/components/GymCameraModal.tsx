@@ -59,7 +59,6 @@ export function GymCameraModal({
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         quality: 0.9,
-        saveToPhotos: true,
       });
       if (!result.canceled && result.assets[0]) {
         setPhotoUri(result.assets[0].uri);
@@ -127,7 +126,7 @@ export function GymCameraModal({
             </TouchableOpacity>
             <View style={gc.savedChip}>
               <Ionicons name="checkmark-circle" size={12} color={BrutlColors.success} />
-              <BrutlText style={gc.savedChipTxt}>SAVED TO GALLERY</BrutlText>
+              <BrutlText style={gc.savedChipTxt}>PHOTO TAKEN</BrutlText>
             </View>
             <BrutlText style={gc.dateLabel}>{dateStr}</BrutlText>
           </View>
