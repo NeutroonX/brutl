@@ -10,6 +10,7 @@ import {
 
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrutlText } from '@/components/ui/BrutlText';
@@ -19,7 +20,7 @@ const QUIPS = [
   'IRON NEVER LIES',
   'NO EXCUSES. ONLY REPS.',
   'EARN IT EVERY SESSION.',
-  'PAIN IS TEMPORARY.\nPRs LAST FOREVER.',
+  'PAIN IS TEMPORARY. PRS LAST FOREVER.',
   'THE GRIND NEVER STOPS.',
   'BUILT IN THE DARK.',
   'LIFT HEAVY. LIVE HEAVY.',
@@ -37,9 +38,12 @@ export function GymCameraModal({
   visible: boolean;
   onClose: () => void;
 }) {
+  const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions();
   const [state, setState] = useState<State>('idle');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [launching, setLaunching] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const insets = useSafeAreaInsets();
 
   const quip = useMemo(
@@ -58,11 +62,14 @@ export function GymCameraModal({
     try {
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.9,
+        allowsEditing: false,
+        quality: 1,
       });
       if (!result.canceled && result.assets[0]) {
-        setPhotoUri(result.assets[0].uri);
+        const uri = result.assets[0].uri;
+        setPhotoUri(uri);
         setState('preview');
+        saveToGallery(uri);
       } else {
         onClose();
       }
@@ -73,14 +80,35 @@ export function GymCameraModal({
     }
   }
 
+  async function saveToGallery(uri: string) {
+    setSaving(true);
+    try {
+      let granted = mediaPermission?.granted;
+      if (!granted) {
+        const { granted: g } = await requestMediaPermission();
+        granted = g;
+      }
+      if (granted) {
+        await MediaLibrary.saveToLibraryAsync(uri);
+        setSaved(true);
+      }
+    } catch {
+      // silent — photo still visible in preview
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function retake() {
     setPhotoUri(null);
+    setSaved(false);
     setState('idle');
     launchCamera();
   }
 
   function handleClose() {
     setPhotoUri(null);
+    setSaved(false);
     setState('idle');
     onClose();
   }
@@ -88,11 +116,11 @@ export function GymCameraModal({
   return (
     <Modal visible={visible} animationType="slide" statusBarTranslucent onRequestClose={handleClose}>
       {state === 'idle' ? (
-        /* Launch state — shown briefly while system camera opens */
-        <View style={[gc.launchContainer, { paddingTop: insets.top }]}>
+        <View style={[gc.launchContainer, { paddingTop: insets.top + BrutlSpacing.sm }]}>
           <TouchableOpacity onPress={handleClose} style={gc.launchClose} hitSlop={12}>
             <Ionicons name="close" size={22} color={BrutlColors.textMuted} />
           </TouchableOpacity>
+
           <View style={gc.launchBody}>
             {launching ? (
               <ActivityIndicator size="large" color={BrutlColors.accent} />
@@ -102,7 +130,7 @@ export function GymCameraModal({
                   <Ionicons name="camera" size={40} color={BrutlColors.accent} />
                 </View>
                 <BrutlText style={gc.launchTitle}>GYM SHOT</BrutlText>
-                <BrutlText style={gc.launchSub}>Photo saves to your gallery automatically.</BrutlText>
+                <BrutlText style={gc.launchSub}>Take a progress photo. Saved to your gallery.</BrutlText>
                 <TouchableOpacity style={gc.launchBtn} onPress={launchCamera} activeOpacity={0.8}>
                   <BrutlText style={gc.launchBtnTxt}>OPEN CAMERA</BrutlText>
                 </TouchableOpacity>
@@ -111,38 +139,60 @@ export function GymCameraModal({
           </View>
         </View>
       ) : (
-        /* Branded preview */
-        <View style={gc.fill}>
-          {photoUri && (
-            <Image source={{ uri: photoUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-          )}
+        /* ── Branded preview ─────────────────────────────────── */
+        <View style={gc.previewContainer}>
+          {/* Full 4:3 image — contained, no cropping */}
+          <View style={gc.imageArea}>
+            {photoUri && (
+              <Image
+                source={{ uri: photoUri }}
+                style={gc.photo}
+                resizeMode="contain"
+              />
+            )}
+          </View>
 
-          <View style={gc.bottomDark} />
-          <View style={gc.accentStripe} />
+          {/* Branding overlay pinned to bottom of image area */}
+          <View style={gc.overlayStripe} />
+          <View style={gc.brandRow}>
+            <View>
+              <BrutlText style={gc.brandName}>BRUTL</BrutlText>
+              <BrutlText style={gc.quipLine}>{quip}</BrutlText>
+            </View>
+            <View style={gc.dateBlock}>
+              <BrutlText style={gc.dateLabel}>{dateStr}</BrutlText>
+              <BrutlText style={gc.brandDomain}>brutl.app</BrutlText>
+            </View>
+          </View>
 
-          <View style={[gc.topBar, { paddingTop: insets.top + BrutlSpacing.sm }]}>
+          {/* Top bar */}
+          <View style={[gc.topBar, { paddingTop: insets.top + BrutlSpacing.xs }]}>
             <TouchableOpacity onPress={handleClose} style={gc.iconBtn} hitSlop={12}>
-              <Ionicons name="close" size={22} color="rgba(255,255,255,0.9)" />
+              <Ionicons name="close" size={20} color="rgba(255,255,255,0.9)" />
             </TouchableOpacity>
             <View style={gc.savedChip}>
-              <Ionicons name="checkmark-circle" size={12} color={BrutlColors.success} />
-              <BrutlText style={gc.savedChipTxt}>PHOTO TAKEN</BrutlText>
+              {saving ? (
+                <ActivityIndicator size="small" color={BrutlColors.textMuted} />
+              ) : (
+                <Ionicons
+                  name={saved ? 'checkmark-circle' : 'ellipse-outline'}
+                  size={12}
+                  color={saved ? BrutlColors.success : BrutlColors.textDisabled}
+                />
+              )}
+              <BrutlText style={[gc.savedChipTxt, saved && { color: BrutlColors.success }]}>
+                {saving ? 'SAVING...' : saved ? 'SAVED' : 'NOT SAVED'}
+              </BrutlText>
             </View>
-            <BrutlText style={gc.dateLabel}>{dateStr}</BrutlText>
           </View>
 
-          <View style={[gc.brandBlock, { paddingBottom: insets.bottom + 120 }]}>
-            <BrutlText style={gc.brandName}>BRUTL</BrutlText>
-            <BrutlText style={gc.quipLine}>{quip}</BrutlText>
-            <BrutlText style={gc.brandDomain}>brutl.app</BrutlText>
-          </View>
-
-          <View style={[gc.actionRow, { paddingBottom: insets.bottom + BrutlSpacing.xl }]}>
+          {/* Actions */}
+          <View style={[gc.actionRow, { paddingBottom: insets.bottom + BrutlSpacing.md }]}>
             <TouchableOpacity style={gc.doneBtn} onPress={handleClose} activeOpacity={0.85}>
               <BrutlText style={gc.doneBtnTxt}>DONE</BrutlText>
             </TouchableOpacity>
             <TouchableOpacity style={gc.retakeBtn} onPress={retake} activeOpacity={0.8}>
-              <Ionicons name="camera-reverse-outline" size={18} color={BrutlColors.textMuted} />
+              <Ionicons name="camera-reverse-outline" size={16} color={BrutlColors.textMuted} />
               <BrutlText style={gc.retakeTxt}>RETAKE</BrutlText>
             </TouchableOpacity>
           </View>
@@ -153,19 +203,20 @@ export function GymCameraModal({
 }
 
 const gc = StyleSheet.create({
-  fill: { flex: 1, backgroundColor: '#000' },
-
+  // ── idle / launch ──────────────────────────────────────────
   launchContainer: {
-    flex: 1, backgroundColor: BrutlColors.bg,
+    flex: 1,
+    backgroundColor: BrutlColors.bg,
     paddingHorizontal: BrutlSpacing.xl,
   },
   launchClose: {
     alignSelf: 'flex-end',
-    paddingTop: BrutlSpacing.md,
     padding: BrutlSpacing.sm,
   },
   launchBody: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: BrutlSpacing.md,
   },
   cameraIconBox: {
@@ -176,12 +227,16 @@ const gc = StyleSheet.create({
     marginBottom: BrutlSpacing.sm,
   },
   launchTitle: {
-    fontFamily: BrutlFonts.display, fontSize: 36,
-    color: BrutlColors.textPrimary, letterSpacing: 3,
+    fontFamily: BrutlFonts.display,
+    fontSize: 36,
+    color: BrutlColors.textPrimary,
+    letterSpacing: 2,
   },
   launchSub: {
-    fontSize: 13, color: BrutlColors.textMuted,
-    textAlign: 'center', lineHeight: 20,
+    fontSize: 13,
+    color: BrutlColors.textMuted,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   launchBtn: {
     marginTop: BrutlSpacing.sm,
@@ -191,87 +246,136 @@ const gc = StyleSheet.create({
     paddingVertical: BrutlSpacing.md,
   },
   launchBtnTxt: {
-    fontFamily: BrutlFonts.display, fontSize: 18,
-    color: '#fff', letterSpacing: 1,
+    fontFamily: BrutlFonts.display,
+    fontSize: 18,
+    color: '#fff',
+    letterSpacing: 1,
+  },
+
+  // ── preview ────────────────────────────────────────────────
+  previewContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  imageArea: {
+    flex: 1,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+  },
+  photo: {
+    width: '100%',
+    height: '100%',
+  },
+
+  overlayStripe: {
+    height: 3,
+    backgroundColor: BrutlColors.accent,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    backgroundColor: '#0A0A0A',
+    paddingHorizontal: BrutlSpacing.lg,
+    paddingTop: BrutlSpacing.sm,
+    paddingBottom: BrutlSpacing.sm,
+  },
+  brandName: {
+    fontFamily: BrutlFonts.display,
+    fontSize: 44,
+    color: '#fff',
+    letterSpacing: 4,
+    lineHeight: 46,
+  },
+  quipLine: {
+    fontFamily: BrutlFonts.display,
+    fontSize: 12,
+    color: BrutlColors.accent,
+    letterSpacing: 1.5,
+    lineHeight: 16,
+  },
+  dateBlock: {
+    alignItems: 'flex-end',
+    gap: 2,
+  },
+  dateLabel: {
+    fontFamily: BrutlFonts.display,
+    fontSize: 11,
+    color: BrutlColors.textMuted,
+    letterSpacing: 1.5,
+  },
+  brandDomain: {
+    fontSize: 10,
+    color: BrutlColors.textDisabled,
+    letterSpacing: 1.5,
   },
 
   topBar: {
-    position: 'absolute', top: 0, left: 0, right: 0,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    position: 'absolute',
+    top: 0, left: 0, right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: BrutlSpacing.md,
-    paddingBottom: BrutlSpacing.md,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingBottom: BrutlSpacing.sm,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   iconBtn: {
-    width: 44, height: 44,
-    alignItems: 'center', justifyContent: 'center',
+    width: 36, height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: BrutlRadius.full,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   savedChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: `${BrutlColors.success}20`,
-    borderWidth: 1, borderColor: `${BrutlColors.success}40`,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(0,0,0,0.4)',
     borderRadius: BrutlRadius.full,
     paddingHorizontal: BrutlSpacing.sm,
-    paddingVertical: 3,
+    paddingVertical: 4,
   },
   savedChipTxt: {
-    fontSize: 9, color: BrutlColors.success, letterSpacing: 1,
-  },
-  dateLabel: {
-    fontFamily: BrutlFonts.display, fontSize: 12,
-    color: 'rgba(255,255,255,0.7)', letterSpacing: 2,
-  },
-
-  bottomDark: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    height: '48%', backgroundColor: 'rgba(0,0,0,0.82)',
-  },
-  accentStripe: {
-    position: 'absolute', bottom: '48%', left: 0, right: 0,
-    height: 3, backgroundColor: BrutlColors.accent,
-  },
-
-  brandBlock: {
-    position: 'absolute', bottom: 0, left: BrutlSpacing.lg, right: BrutlSpacing.lg,
-  },
-  brandName: {
-    fontFamily: BrutlFonts.display, fontSize: 80,
-    color: '#fff', letterSpacing: 6, lineHeight: 82,
-  },
-  quipLine: {
-    fontFamily: BrutlFonts.display, fontSize: 22,
-    color: BrutlColors.accent, letterSpacing: 2, lineHeight: 28,
-    marginTop: BrutlSpacing.xs,
-  },
-  brandDomain: {
-    fontSize: 11, color: 'rgba(255,255,255,0.35)',
-    letterSpacing: 2, marginTop: BrutlSpacing.xs,
+    fontSize: 10,
+    color: BrutlColors.textDisabled,
+    letterSpacing: 1,
   },
 
   actionRow: {
-    position: 'absolute', bottom: 0, left: BrutlSpacing.md, right: BrutlSpacing.md,
-    flexDirection: 'row', gap: BrutlSpacing.sm,
+    flexDirection: 'row',
+    gap: BrutlSpacing.sm,
+    paddingHorizontal: BrutlSpacing.md,
+    paddingTop: BrutlSpacing.sm,
+    backgroundColor: '#0A0A0A',
   },
   doneBtn: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: BrutlColors.accent,
     borderRadius: BrutlRadius.sm,
-    paddingVertical: BrutlSpacing.md,
+    paddingVertical: BrutlSpacing.sm + 2,
   },
   doneBtnTxt: {
-    fontFamily: BrutlFonts.display, fontSize: 18,
-    color: '#fff', letterSpacing: 1,
+    fontFamily: BrutlFonts.display,
+    fontSize: 16,
+    color: '#fff',
+    letterSpacing: 1,
   },
   retakeBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: BrutlSpacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: BrutlSpacing.xs,
     paddingHorizontal: BrutlSpacing.md,
     borderRadius: BrutlRadius.sm,
-    borderWidth: 1, borderColor: BrutlColors.borderVisible,
+    borderWidth: 1,
+    borderColor: BrutlColors.borderVisible,
   },
   retakeTxt: {
-    fontFamily: BrutlFonts.display, fontSize: 14,
-    color: BrutlColors.textMuted, letterSpacing: 1,
+    fontFamily: BrutlFonts.display,
+    fontSize: 14,
+    color: BrutlColors.textMuted,
+    letterSpacing: 1,
   },
 });
