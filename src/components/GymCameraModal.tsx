@@ -1,5 +1,6 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   Modal,
   StyleSheet,
@@ -8,8 +9,7 @@ import {
 } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
-import { CameraView, useCameraPermissions } from 'expo-camera';
-import * as MediaLibrary from 'expo-media-library';
+import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrutlText } from '@/components/ui/BrutlText';
@@ -20,7 +20,7 @@ const QUIPS = [
   'NO EXCUSES. ONLY REPS.',
   'EARN IT EVERY SESSION.',
   'PAIN IS TEMPORARY.\nPRs LAST FOREVER.',
-  'THE GRIND DOESN\'T STOP.',
+  'THE GRIND NEVER STOPS.',
   'BUILT IN THE DARK.',
   'LIFT HEAVY. LIVE HEAVY.',
   'CONSISTENCY BEATS INTENSITY.',
@@ -28,7 +28,7 @@ const QUIPS = [
   'WHO SAID YOU COULD REST?',
 ];
 
-type State = 'camera' | 'preview';
+type State = 'idle' | 'preview';
 
 export function GymCameraModal({
   visible,
@@ -37,18 +37,13 @@ export function GymCameraModal({
   visible: boolean;
   onClose: () => void;
 }) {
-  const [camPermission, requestCamPermission] = useCameraPermissions();
-  const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions();
-  const [state, setState] = useState<State>('camera');
+  const [state, setState] = useState<State>('idle');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const cameraRef = useRef<CameraView>(null);
+  const [launching, setLaunching] = useState(false);
   const insets = useSafeAreaInsets();
 
   const quip = useMemo(
     () => QUIPS[Math.floor(Math.random() * QUIPS.length)],
-    // new quip per capture
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [photoUri],
   );
@@ -57,89 +52,67 @@ export function GymCameraModal({
     .toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
     .toUpperCase();
 
-  async function capture() {
+  async function launchCamera() {
+    if (launching) return;
+    setLaunching(true);
     try {
-      const photo = await cameraRef.current?.takePictureAsync({ quality: 0.9 });
-      if (photo?.uri) {
-        setPhotoUri(photo.uri);
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.9,
+        saveToPhotos: true,
+      });
+      if (!result.canceled && result.assets[0]) {
+        setPhotoUri(result.assets[0].uri);
         setState('preview');
-      }
-    } catch {
-      // camera not ready — ignore
-    }
-  }
-
-  async function save() {
-    if (!photoUri) return;
-    setSaving(true);
-    try {
-      if (!mediaPermission?.granted) {
-        const { granted } = await requestMediaPermission();
-        if (!granted) { setSaving(false); return; }
-      }
-      await MediaLibrary.saveToLibraryAsync(photoUri);
-      setSaved(true);
-      setTimeout(() => {
-        setSaved(false);
+      } else {
         onClose();
-        setState('camera');
-        setPhotoUri(null);
-      }, 1000);
+      }
     } catch {
-      setSaving(false);
+      onClose();
+    } finally {
+      setLaunching(false);
     }
   }
 
   function retake() {
-    setState('camera');
     setPhotoUri(null);
-    setSaved(false);
+    setState('idle');
+    launchCamera();
   }
 
   function handleClose() {
-    retake();
+    setPhotoUri(null);
+    setState('idle');
     onClose();
-  }
-
-  if (camPermission && !camPermission.granted) {
-    return (
-      <Modal visible={visible} animationType="slide" statusBarTranslucent onRequestClose={handleClose}>
-        <View style={[gc.permContainer, { paddingTop: insets.top + BrutlSpacing.xl }]}>
-          <Ionicons name="camera-outline" size={48} color={BrutlColors.accent} />
-          <BrutlText style={gc.permTitle}>CAMERA ACCESS</BrutlText>
-          <BrutlText style={gc.permBody}>Grant camera access to capture your gym progress shots.</BrutlText>
-          <TouchableOpacity style={gc.permBtn} onPress={requestCamPermission}>
-            <BrutlText style={gc.permBtnTxt}>ALLOW CAMERA</BrutlText>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleClose} hitSlop={12} style={{ marginTop: BrutlSpacing.md }}>
-            <BrutlText variant="muted">Not now</BrutlText>
-          </TouchableOpacity>
-        </View>
-      </Modal>
-    );
   }
 
   return (
     <Modal visible={visible} animationType="slide" statusBarTranslucent onRequestClose={handleClose}>
-      {state === 'camera' ? (
-        <View style={gc.fill}>
-          <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
-
-          <View style={[gc.topBar, { paddingTop: insets.top + BrutlSpacing.sm }]}>
-            <TouchableOpacity onPress={handleClose} style={gc.iconBtn} hitSlop={12}>
-              <Ionicons name="close" size={22} color="#fff" />
-            </TouchableOpacity>
-            <BrutlText style={gc.topBarTitle}>GYM SHOT</BrutlText>
-            <View style={{ width: 44 }} />
-          </View>
-
-          <View style={[gc.captureArea, { paddingBottom: insets.bottom + BrutlSpacing.xl }]}>
-            <TouchableOpacity style={gc.captureRing} onPress={capture} activeOpacity={0.75}>
-              <View style={gc.captureCore} />
-            </TouchableOpacity>
+      {state === 'idle' ? (
+        /* Launch state — shown briefly while system camera opens */
+        <View style={[gc.launchContainer, { paddingTop: insets.top }]}>
+          <TouchableOpacity onPress={handleClose} style={gc.launchClose} hitSlop={12}>
+            <Ionicons name="close" size={22} color={BrutlColors.textMuted} />
+          </TouchableOpacity>
+          <View style={gc.launchBody}>
+            {launching ? (
+              <ActivityIndicator size="large" color={BrutlColors.accent} />
+            ) : (
+              <>
+                <View style={gc.cameraIconBox}>
+                  <Ionicons name="camera" size={40} color={BrutlColors.accent} />
+                </View>
+                <BrutlText style={gc.launchTitle}>GYM SHOT</BrutlText>
+                <BrutlText style={gc.launchSub}>Photo saves to your gallery automatically.</BrutlText>
+                <TouchableOpacity style={gc.launchBtn} onPress={launchCamera} activeOpacity={0.8}>
+                  <BrutlText style={gc.launchBtnTxt}>OPEN CAMERA</BrutlText>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
       ) : (
+        /* Branded preview */
         <View style={gc.fill}>
           {photoUri && (
             <Image source={{ uri: photoUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
@@ -149,11 +122,14 @@ export function GymCameraModal({
           <View style={gc.accentStripe} />
 
           <View style={[gc.topBar, { paddingTop: insets.top + BrutlSpacing.sm }]}>
-            <TouchableOpacity onPress={retake} style={gc.iconBtn} hitSlop={12}>
+            <TouchableOpacity onPress={handleClose} style={gc.iconBtn} hitSlop={12}>
               <Ionicons name="close" size={22} color="rgba(255,255,255,0.9)" />
             </TouchableOpacity>
+            <View style={gc.savedChip}>
+              <Ionicons name="checkmark-circle" size={12} color={BrutlColors.success} />
+              <BrutlText style={gc.savedChipTxt}>SAVED TO GALLERY</BrutlText>
+            </View>
             <BrutlText style={gc.dateLabel}>{dateStr}</BrutlText>
-            <View style={{ width: 44 }} />
           </View>
 
           <View style={[gc.brandBlock, { paddingBottom: insets.bottom + 120 }]}>
@@ -163,22 +139,9 @@ export function GymCameraModal({
           </View>
 
           <View style={[gc.actionRow, { paddingBottom: insets.bottom + BrutlSpacing.xl }]}>
-            <TouchableOpacity
-              style={[gc.saveBtn, (saving || saved) && { opacity: 0.7 }]}
-              onPress={save}
-              disabled={saving || saved}
-              activeOpacity={0.85}
-            >
-              <Ionicons
-                name={saved ? 'checkmark-circle' : 'download-outline'}
-                size={20}
-                color="#fff"
-              />
-              <BrutlText style={gc.saveBtnTxt}>
-                {saved ? 'SAVED' : saving ? 'SAVING...' : 'SAVE TO GALLERY'}
-              </BrutlText>
+            <TouchableOpacity style={gc.doneBtn} onPress={handleClose} activeOpacity={0.85}>
+              <BrutlText style={gc.doneBtnTxt}>DONE</BrutlText>
             </TouchableOpacity>
-
             <TouchableOpacity style={gc.retakeBtn} onPress={retake} activeOpacity={0.8}>
               <Ionicons name="camera-reverse-outline" size={18} color={BrutlColors.textMuted} />
               <BrutlText style={gc.retakeTxt}>RETAKE</BrutlText>
@@ -193,27 +156,42 @@ export function GymCameraModal({
 const gc = StyleSheet.create({
   fill: { flex: 1, backgroundColor: '#000' },
 
-  permContainer: {
+  launchContainer: {
     flex: 1, backgroundColor: BrutlColors.bg,
+    paddingHorizontal: BrutlSpacing.xl,
+  },
+  launchClose: {
+    alignSelf: 'flex-end',
+    paddingTop: BrutlSpacing.md,
+    padding: BrutlSpacing.sm,
+  },
+  launchBody: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    gap: BrutlSpacing.md,
+  },
+  cameraIconBox: {
+    width: 80, height: 80, borderRadius: BrutlRadius.lg,
+    backgroundColor: `${BrutlColors.accent}18`,
+    borderWidth: 1, borderColor: `${BrutlColors.accent}40`,
     alignItems: 'center', justifyContent: 'center',
-    padding: BrutlSpacing.xl, gap: BrutlSpacing.md,
+    marginBottom: BrutlSpacing.sm,
   },
-  permTitle: {
-    fontFamily: BrutlFonts.display, fontSize: 32,
-    color: BrutlColors.textPrimary, letterSpacing: 2,
+  launchTitle: {
+    fontFamily: BrutlFonts.display, fontSize: 36,
+    color: BrutlColors.textPrimary, letterSpacing: 3,
   },
-  permBody: {
-    fontSize: 14, color: BrutlColors.textMuted,
+  launchSub: {
+    fontSize: 13, color: BrutlColors.textMuted,
     textAlign: 'center', lineHeight: 20,
   },
-  permBtn: {
+  launchBtn: {
+    marginTop: BrutlSpacing.sm,
     backgroundColor: BrutlColors.accent,
     borderRadius: BrutlRadius.sm,
     paddingHorizontal: BrutlSpacing.xl,
     paddingVertical: BrutlSpacing.md,
-    marginTop: BrutlSpacing.sm,
   },
-  permBtnTxt: {
+  launchBtnTxt: {
     fontFamily: BrutlFonts.display, fontSize: 18,
     color: '#fff', letterSpacing: 1,
   },
@@ -231,38 +209,31 @@ const gc = StyleSheet.create({
     borderRadius: BrutlRadius.full,
     backgroundColor: 'rgba(255,255,255,0.12)',
   },
-  topBarTitle: {
-    fontFamily: BrutlFonts.display, fontSize: 16,
-    color: '#fff', letterSpacing: 3,
+  savedChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: `${BrutlColors.success}20`,
+    borderWidth: 1, borderColor: `${BrutlColors.success}40`,
+    borderRadius: BrutlRadius.full,
+    paddingHorizontal: BrutlSpacing.sm,
+    paddingVertical: 3,
   },
-  captureArea: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    alignItems: 'center',
+  savedChipTxt: {
+    fontSize: 9, color: BrutlColors.success, letterSpacing: 1,
   },
-  captureRing: {
-    width: 84, height: 84, borderRadius: 42,
-    borderWidth: 4, borderColor: '#fff',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  captureCore: {
-    width: 66, height: 66, borderRadius: 33,
-    backgroundColor: '#fff',
+  dateLabel: {
+    fontFamily: BrutlFonts.display, fontSize: 12,
+    color: 'rgba(255,255,255,0.7)', letterSpacing: 2,
   },
 
   bottomDark: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    height: '48%',
-    backgroundColor: 'rgba(0,0,0,0.82)',
+    height: '48%', backgroundColor: 'rgba(0,0,0,0.82)',
   },
   accentStripe: {
     position: 'absolute', bottom: '48%', left: 0, right: 0,
-    height: 3,
-    backgroundColor: BrutlColors.accent,
+    height: 3, backgroundColor: BrutlColors.accent,
   },
-  dateLabel: {
-    fontFamily: BrutlFonts.display, fontSize: 13,
-    color: 'rgba(255,255,255,0.75)', letterSpacing: 2,
-  },
+
   brandBlock: {
     position: 'absolute', bottom: 0, left: BrutlSpacing.lg, right: BrutlSpacing.lg,
   },
@@ -279,19 +250,19 @@ const gc = StyleSheet.create({
     fontSize: 11, color: 'rgba(255,255,255,0.35)',
     letterSpacing: 2, marginTop: BrutlSpacing.xs,
   },
+
   actionRow: {
     position: 'absolute', bottom: 0, left: BrutlSpacing.md, right: BrutlSpacing.md,
     flexDirection: 'row', gap: BrutlSpacing.sm,
   },
-  saveBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: BrutlSpacing.xs,
+  doneBtn: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
     backgroundColor: BrutlColors.accent,
     borderRadius: BrutlRadius.sm,
     paddingVertical: BrutlSpacing.md,
   },
-  saveBtnTxt: {
-    fontFamily: BrutlFonts.display, fontSize: 16,
+  doneBtnTxt: {
+    fontFamily: BrutlFonts.display, fontSize: 18,
     color: '#fff', letterSpacing: 1,
   },
   retakeBtn: {

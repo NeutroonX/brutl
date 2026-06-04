@@ -37,14 +37,6 @@
       "expo-router",
       "expo-dev-client",
       [
-        "expo-media-library",
-        {
-          "photosPermission": "Allow BRUTL to save your gym progress photos.",
-          "savePhotosPermission": "Allow BRUTL to save photos to your gallery.",
-          "isAccessMediaLocationEnabled": false
-        }
-      ],
-      [
         "expo-camera",
         {
           "cameraPermission": "Allow BRUTL to access your camera to scan food barcodes and photograph meals."
