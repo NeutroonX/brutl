@@ -55,6 +55,7 @@ import { useRoutineStore } from '@/stores/routine.store';
 import { useUserStore } from '@/stores/user.store';
 import { useWorkoutStore } from '@/stores/workout.store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { GymCameraModal } from '@/components/GymCameraModal';
 import type { ExerciseSet } from '@/types';
 
 const SCREEN_H = Dimensions.get('window').height;
@@ -984,6 +985,7 @@ export default function WorkoutScreen() {
   const [exercises, setExercises] = useState<LiveExercise[]>([]);
   const [showPicker, setShowPicker] = useState(false);
   const [showRoutines, setShowRoutines] = useState(false);
+  const [showGymCamera, setShowGymCamera] = useState(false);
   const [elapsedSecs, setElapsedSecs] = useState(0);
   const [restSecs, setRestSecs] = useState<number | null>(null);
   const [infoSheet, setInfoSheet] = useState<string | null>(null);
@@ -1208,6 +1210,9 @@ export default function WorkoutScreen() {
           <Ionicons name="copy-outline" size={13} color={BrutlColors.textMuted} />
           <BrutlText style={st.routinesBtnTxt}>ROUTINES</BrutlText>
         </TouchableOpacity>
+        <TouchableOpacity style={st.gymShotBtn} onPress={() => setShowGymCamera(true)} hitSlop={8}>
+          <Ionicons name="camera" size={18} color={BrutlColors.accent} />
+        </TouchableOpacity>
         <View style={st.headerRight}>
           <BrutlText style={st.headerTimer}>{formatTime(elapsedSecs)}</BrutlText>
           <BrutlText style={st.headerVolume}>{Math.round(curVolume)}kg total</BrutlText>
@@ -1305,6 +1310,8 @@ export default function WorkoutScreen() {
       </View>
 
       {/* Routines sheet */}
+      <GymCameraModal visible={showGymCamera} onClose={() => setShowGymCamera(false)} />
+
       {showRoutines && (
         <RoutinesSheet
           onLoadDay={handleLoadDay}
@@ -1360,6 +1367,7 @@ const st = StyleSheet.create({
   },
   headerSub: { fontSize: 10, color: '#555555', marginTop: 1 },
   routinesBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: BrutlRadius.sm, borderWidth: 1, borderColor: BrutlColors.border },
+  gymShotBtn: { width: 34, height: 34, borderRadius: BrutlRadius.sm, borderWidth: 1, borderColor: `${BrutlColors.accent}50`, backgroundColor: `${BrutlColors.accent}12`, alignItems: 'center', justifyContent: 'center' },
   routinesBtnTxt: { fontSize: 9, color: BrutlColors.textMuted, fontFamily: BrutlFonts.display, letterSpacing: 1 },
   headerRight: { alignItems: 'flex-end', gap: 2 },
   headerTimer: { fontSize: 14, color: BrutlColors.accent, fontFamily: BrutlFonts.mono },
