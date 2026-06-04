@@ -395,13 +395,13 @@ const mc = StyleSheet.create({
   chip: {
     flex: 1,
     backgroundColor: BrutlColors.bgCard,
-    borderRadius: BrutlRadius.full,
+    borderRadius: BrutlRadius.sm,
     borderWidth: 1,
     borderColor: BrutlColors.borderVisible,
-    paddingHorizontal: CHIP_PAD_H,
-    paddingTop: 12,
-    paddingBottom: 20,
-    gap: 1,
+    paddingHorizontal: 8,
+    paddingTop: 10,
+    paddingBottom: 18,
+    gap: 2,
     overflow: 'hidden',
   },
   value: {
@@ -418,17 +418,17 @@ const mc = StyleSheet.create({
   },
   pct: {
     fontFamily: 'BebasNeue_400Regular',
-    fontSize: 12,
+    fontSize: 13,
     letterSpacing: 0.5,
   },
   barTrack: {
     position: 'absolute',
     bottom: 0, left: 0, right: 0,
-    height: 3,
-    backgroundColor: BrutlColors.borderVisible,
+    height: 4,
+    backgroundColor: BrutlColors.border,
   },
   barFill: {
-    height: 3,
+    height: 4,
   },
   label: {
     fontSize: 8,
@@ -877,7 +877,7 @@ const st = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
-  chipsRow: { flexDirection: 'row', gap: CHIP_GAP },
+  chipsRow: { flexDirection: 'row', gap: BrutlSpacing.xs },
 
   section: { gap: BrutlSpacing.sm },
   sectionLabel: { fontSize: 11, color: BrutlColors.accent, letterSpacing: 1.5 },
