@@ -105,7 +105,7 @@ export default function MacroReviewScreen() {
 
   async function handleLock() {
     setSaving(true);
-    await setProfile({ ...profile, id: profile.id!, macroTargets: macros });
+    await setProfile({ ...profile!, id: profile!.id!, name: profile!.name ?? '', macroTargets: macros });
     router.push('/onboarding/first-roast' as any);
   }
 
