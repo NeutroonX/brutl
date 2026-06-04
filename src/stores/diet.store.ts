@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import { STORAGE_KEYS, storageGet, storageSet } from '@/lib/storage';
+import { calcMacroCompliance } from '@/lib/xp';
 import { useUserStore } from '@/stores/user.store';
 import type { DietLog, MacroTargets, MealEntry } from '@/types';
 
@@ -39,16 +40,23 @@ export const useDietStore = create<DietState>((set, get) => ({
   addMeal: async (meal, effectiveTargets?) => {
     const today = todayKey();
     const { logs } = get();
+    const profile = useUserStore.getState().profile;
     const existing = logs.find((l) => l.date === today);
     const stamped: MealEntry = { ...meal, loggedAt: Date.now() };
     const meals = existing ? [...existing.meals, stamped] : [stamped];
     const macros = sumMacros(meals);
+
+    const target = effectiveTargets ?? profile?.macroTargets;
+    const complianceScore = target
+      ? calcMacroCompliance(macros.totalProteinG, target.proteinG)
+      : 0;
+
     const updated: DietLog = {
       id: existing?.id ?? Date.now().toString(),
       date: today,
       meals,
       ...macros,
-      complianceScore: 0,
+      complianceScore,
     };
     const updatedLogs = existing
       ? logs.map((l) => (l.date === today ? updated : l))
@@ -56,17 +64,14 @@ export const useDietStore = create<DietState>((set, get) => ({
     set({ logs: updatedLogs, todayLog: updated });
     await storageSet(STORAGE_KEYS.dietLog, updatedLogs);
 
-    // Check protein ratio against target (use phase-adjusted targets when provided)
-    const profile = useUserStore.getState().profile;
     if (!profile) return;
 
-    const target = (effectiveTargets ?? profile.macroTargets).proteinG;
-    const proteinRatio = target > 0 ? macros.totalProteinG / target : 0;
+    const targetProtein = target?.proteinG ?? 0;
+    const proteinRatio = targetProtein > 0 ? macros.totalProteinG / targetProtein : 0;
 
-    // Track protein streak (consecutive days hitting target)
     if (proteinRatio >= 1.0) {
       const yesterday = todayKey() - 24 * 60 * 60 * 1000;
-      const hitYesterday = logs.some((l) => l.date === yesterday && l.totalProteinG >= target);
+      const hitYesterday = logs.some((l) => l.date === yesterday && l.totalProteinG >= targetProtein);
       set({ proteinStreakDays: hitYesterday ? get().proteinStreakDays + 1 : 1 });
     }
   },

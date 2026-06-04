@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -24,19 +24,30 @@ const PHASE_OPTIONS: { kind: DietPhaseKind; label: string; desc: string; color: 
   { kind: 'MAINTAIN', label: 'MAINTAIN', desc: 'TDEE — recomposition and recovery',       color: BrutlColors.warning },
 ];
 
-const CYCLE_OPTIONS: { label: string; pattern: MacroCyclePattern }[] = [
-  { label: '3-DAY  H / H / L',                 pattern: { days: ['HIGH', 'HIGH', 'LOW'] } },
-  { label: '5-DAY  H / M / H / M / L',         pattern: { days: ['HIGH', 'MODERATE', 'HIGH', 'MODERATE', 'LOW'] } },
-  { label: '7-DAY  H / M / H / L / M / H / L', pattern: { days: ['HIGH', 'MODERATE', 'HIGH', 'LOW', 'MODERATE', 'HIGH', 'LOW'] } },
-  { label: 'FLAT — MODERATE EVERY DAY',        pattern: { days: ['MODERATE'] } },
+const CYCLE_OPTIONS: { label: string; desc: string; pattern: MacroCyclePattern }[] = [
+  {
+    label: 'FLAT',
+    desc: 'Same macros every day — simple & consistent',
+    pattern: { days: ['MODERATE'] },
+  },
+  {
+    label: 'STANDARD',
+    desc: '3-day carb cycle: High / Moderate / Low — calorie-neutral weekly avg',
+    pattern: { days: ['HIGH', 'MODERATE', 'LOW'] },
+  },
+  {
+    label: 'AGGRESSIVE',
+    desc: '7-day cycle: H / M / H / L / M / H / L — advanced carb cycling',
+    pattern: { days: ['HIGH', 'MODERATE', 'HIGH', 'LOW', 'MODERATE', 'HIGH', 'LOW'] },
+  },
 ];
 
 function findCycleLabel(phase: DietPhase | null): string {
-  if (!phase) return CYCLE_OPTIONS[0].label;
+  if (!phase) return 'FLAT';
   const match = CYCLE_OPTIONS.find(
     (c) => JSON.stringify(c.pattern.days) === JSON.stringify(phase.cyclePattern.days),
   );
-  return match?.label ?? CYCLE_OPTIONS[0].label;
+  return match?.label ?? 'FLAT';
 }
 
 export function PhaseEditorSheet({
@@ -56,18 +67,17 @@ export function PhaseEditorSheet({
 
   const { mutate, isPending } = useSetDietPhase();
 
-  function handleSave() {
-    if (!profile) return;
-
-    const goalMap = { BULK: 'MUSCLE_GAIN', CUT: 'FAT_LOSS', MAINTAIN: 'RECOMP' } as const;
-    const macroTargets = calcMacroTargets(
-      profile.weightKg,
-      profile.heightCm,
-      profile.age,
-      profile.gender,
-      profile.activityLevel,
-      goalMap[selectedPhase],
+  const goalMap = { BULK: 'MUSCLE_GAIN', CUT: 'FAT_LOSS', MAINTAIN: 'RECOMP' } as const;
+  const previewMacros = useMemo(() => {
+    if (!profile) return null;
+    return calcMacroTargets(
+      profile.weightKg, profile.heightCm, profile.age,
+      profile.gender, profile.activityLevel, goalMap[selectedPhase],
     );
+  }, [profile, selectedPhase]);
+
+  function handleSave() {
+    if (!profile || !previewMacros) return;
 
     const cyclePattern = CYCLE_OPTIONS.find((c) => c.label === selectedCycleLabel)?.pattern
       ?? CYCLE_OPTIONS[0].pattern;
@@ -78,7 +88,7 @@ export function PhaseEditorSheet({
         phase: selectedPhase,
         startDate: new Date().toISOString().split('T')[0],
         endDate: null,
-        macroTargets,
+        macroTargets: previewMacros,
         cyclePattern,
       },
       { onSuccess: onClose },
@@ -128,9 +138,30 @@ export function PhaseEditorSheet({
               })}
             </View>
 
+            {previewMacros && (
+              <View style={[s.macroPreview, { marginTop: BrutlSpacing.md }]}>
+                <BrutlText style={s.sectionLabel}>PROJECTED MACROS</BrutlText>
+                <View style={s.macroRow}>
+                  {(
+                    [
+                      { label: 'KCAL', value: previewMacros.calories, unit: '' },
+                      { label: 'PRO',  value: previewMacros.proteinG,  unit: 'g' },
+                      { label: 'CARB', value: previewMacros.carbsG,    unit: 'g' },
+                      { label: 'FAT',  value: previewMacros.fatG,       unit: 'g' },
+                    ] as { label: string; value: number; unit: string }[]
+                  ).map(({ label, value, unit }) => (
+                    <View key={label} style={s.macroCell}>
+                      <BrutlText style={s.macroCellValue}>{value}{unit}</BrutlText>
+                      <BrutlText style={s.macroCellLabel}>{label}</BrutlText>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
             <BrutlText style={[s.sectionLabel, { marginTop: BrutlSpacing.md }]}>MACRO CYCLING</BrutlText>
             <View style={s.optionGroup}>
-              {CYCLE_OPTIONS.map(({ label }) => {
+              {CYCLE_OPTIONS.map(({ label, desc }) => {
                 const active = selectedCycleLabel === label;
                 return (
                   <TouchableOpacity
@@ -141,7 +172,10 @@ export function PhaseEditorSheet({
                     accessibilityRole="radio"
                     accessibilityState={{ selected: active }}
                   >
-                    <BrutlText style={[s.optionLabel, active && { color: BrutlColors.accent }]}>{label}</BrutlText>
+                    <View style={{ flex: 1 }}>
+                      <BrutlText style={[s.optionLabel, active && { color: BrutlColors.accent }]}>{label}</BrutlText>
+                      <BrutlText style={s.optionDesc}>{desc}</BrutlText>
+                    </View>
                     {active && <Ionicons name="checkmark-circle" size={18} color={BrutlColors.accent} />}
                   </TouchableOpacity>
                 );
@@ -149,7 +183,7 @@ export function PhaseEditorSheet({
             </View>
 
             <BrutlText style={s.hint}>
-              HIGH = +30% carbs / −10% fat. LOW = −45% carbs / +15% fat. Protein never changes.
+              HIGH = +30% carbs / −15% fat / +10% cal. LOW = −30% carbs / +15% fat / −10% cal. Protein stays constant.
             </BrutlText>
           </ScrollView>
 
@@ -256,5 +290,33 @@ const s = StyleSheet.create({
     fontSize: 16,
     color: BrutlColors.textPrimary,
     letterSpacing: 1,
+  },
+  macroPreview: {
+    backgroundColor: BrutlColors.bg,
+    borderRadius: BrutlRadius.md,
+    borderWidth: 1,
+    borderColor: BrutlColors.borderVisible,
+    padding: BrutlSpacing.md,
+  },
+  macroRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: BrutlSpacing.xs,
+  },
+  macroCell: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  macroCellValue: {
+    fontFamily: 'BebasNeue_400Regular',
+    fontSize: 20,
+    color: BrutlColors.accent,
+    letterSpacing: 0.5,
+  },
+  macroCellLabel: {
+    fontSize: 9,
+    color: BrutlColors.textDisabled,
+    letterSpacing: 1.5,
+    marginTop: 2,
   },
 });

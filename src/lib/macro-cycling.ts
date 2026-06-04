@@ -1,10 +1,11 @@
 import type { MacroTargets } from '@/types';
 import type { CycleDayType, DietPhase } from '@/types/diet-phase';
 
+// Calorie-neutral for a balanced H/M/L pattern: (1.10 + 1.00 + 0.90) / 3 = 1.00
 export const CYCLE_MULTIPLIERS: Record<CycleDayType, { carbs: number; fat: number; cal: number }> = {
-  HIGH:     { carbs: 1.30, fat: 0.90, cal: 1.10 },
+  HIGH:     { carbs: 1.30, fat: 0.85, cal: 1.10 },
   MODERATE: { carbs: 1.00, fat: 1.00, cal: 1.00 },
-  LOW:      { carbs: 0.55, fat: 1.15, cal: 0.92 },
+  LOW:      { carbs: 0.70, fat: 1.15, cal: 0.90 },
 };
 
 export function getTodayCycleDayType(phase: DietPhase, date: Date = new Date()): CycleDayType {

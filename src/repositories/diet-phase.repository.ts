@@ -169,6 +169,15 @@ export function useSetDietPhase() {
     mutationFn: async (
       phase: Omit<DietPhase, 'id' | 'createdAt' | 'updatedAt' | 'syncedAt'>,
     ): Promise<DietPhase> => {
+      const today = new Date().toISOString().split('T')[0];
+
+      // Close any previously open phase before inserting the new one
+      await supabase
+        .from('diet_phases')
+        .update({ end_date: today })
+        .eq('user_id', phase.userId)
+        .is('end_date', null);
+
       const { data, error } = await supabase
         .from('diet_phases')
         .insert(dietPhaseToRow(phase))
