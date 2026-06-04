@@ -7,6 +7,7 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import AppTabs from '@/components/app-tabs';
 import { loadApiKeys } from '@/lib/api-keys';
 import { queryClient, queryPersister } from '@/lib/queryClient';
+import { supabase } from '@/lib/supabase';
 import { useUserStore } from '@/stores/user.store';
 import { useRoastStore } from '@/stores/roast.store';
 import { useWorkoutStore } from '@/stores/workout.store';
@@ -37,16 +38,34 @@ export default function RootLayout() {
 
     hydrateSyncQueue();
 
-    Promise.all([
-      loadApiKeys(),
-      loadUser(),
-      loadRoasts(),
-      loadWorkouts(),
-      loadDiet(),
-      loadWatch(),
-      loadRoutines(),
-      loadWeights(),
-    ]).finally(() => setReady(true));
+    async function init() {
+      // Ensure an anonymous Supabase auth session exists so RLS passes.
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        await supabase.auth.signInAnonymously();
+      }
+
+      await Promise.all([
+        loadApiKeys(),
+        loadUser(),
+        loadRoasts(),
+        loadWorkouts(),
+        loadDiet(),
+        loadWatch(),
+        loadRoutines(),
+        loadWeights(),
+      ]);
+
+      // Migrate profile.id from legacy timestamp string to the auth UUID so
+      // Supabase FK (diet_phases.user_id → auth.users.id) and RLS work.
+      const authUser = (await supabase.auth.getUser()).data.user;
+      const profile = useUserStore.getState().profile;
+      if (authUser && profile && profile.id !== authUser.id) {
+        await useUserStore.getState().setProfile({ ...profile, id: authUser.id });
+      }
+    }
+
+    init().finally(() => setReady(true));
 
     registerSyncListeners();
     registerBackgroundSync().catch(console.error);

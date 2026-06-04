@@ -68,6 +68,7 @@ interface UserState {
 
 
 export function buildUserProfile(data: {
+  id?: string;
   name: string;
   age: number;
   weightKg: number;
@@ -77,9 +78,10 @@ export function buildUserProfile(data: {
   goal: Goal;
   weakArea: WeakArea[];
 }): UserProfile {
+  const { id, ...rest } = data;
   return {
-    id: Date.now().toString(),
-    ...data,
+    id: id ?? Date.now().toString(),
+    ...rest,
     rank: 'E',
     xp: 0,
     streakDays: 0,

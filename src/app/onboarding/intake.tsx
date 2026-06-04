@@ -14,6 +14,7 @@ import { BrutlButton } from '@/components/ui/BrutlButton';
 import { BrutlCard } from '@/components/ui/BrutlCard';
 import { BrutlText } from '@/components/ui/BrutlText';
 import { BrutlColors, BrutlFonts, BrutlRadius, BrutlSpacing } from '@/constants/theme';
+import { supabase } from '@/lib/supabase';
 import { buildUserProfile, useUserStore } from '@/stores/user.store';
 import type { ActivityLevel, Gender, Goal, WeakArea } from '@/types';
 
@@ -138,7 +139,9 @@ export default function IntakeScreen() {
 
   async function handleContinue() {
     if (!isValid()) return;
+    const { data: { user } } = await supabase.auth.getUser();
     const profile = buildUserProfile({
+      id: user?.id,
       name: form.name.trim(),
       age: parseInt(form.age),
       weightKg: parseFloat(form.weightKg),
