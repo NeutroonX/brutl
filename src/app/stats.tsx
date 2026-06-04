@@ -576,11 +576,9 @@ function OverviewGrid({
           .map((row) => (
             <View key={(row as any).k} style={s.kvRow}>
               <BrutlText style={s.kvKey}>{(row as any).k}</BrutlText>
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: 5 }}
-              >
+              <View style={s.kvValRow}>
                 {(row as any).dot && <View style={s.greenDot} />}
-                <BrutlText style={s.kvVal}>{(row as any).v}</BrutlText>
+                <BrutlText style={s.kvVal} numberOfLines={2}>{(row as any).v}</BrutlText>
               </View>
             </View>
           ))}
@@ -1441,8 +1439,9 @@ const s = StyleSheet.create({
     alignItems: "flex-start",
     gap: 8,
   },
-  kvKey: { fontSize: 11, color: BrutlColors.textDisabled, flexShrink: 0 },
-  kvVal: { fontSize: 11, color: BrutlColors.textPrimary, letterSpacing: 0.5, flex: 1, textAlign: "right" },
+  kvKey: { fontSize: 10, color: BrutlColors.textDisabled, flexShrink: 0, lineHeight: 16 },
+  kvValRow: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 5 },
+  kvVal: { fontSize: 10, color: BrutlColors.textPrimary, letterSpacing: 0.3, flexShrink: 1, textAlign: "right" },
   greenDot: {
     width: 6,
     height: 6,
