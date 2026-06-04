@@ -39,4 +39,6 @@ export const STORAGE_KEYS = {
   weightLog: 'brutl:weight_log',
   syncQueue: 'brutl:sync_queue',
   queryCache: 'brutl:query_cache',
+  dietPhase: 'brutl:diet_phase',
+  mealPlan: 'brutl:meal_plan',
 } as const;

@@ -2,13 +2,13 @@ import { create } from 'zustand';
 
 import { STORAGE_KEYS, storageGet, storageSet } from '@/lib/storage';
 import { useUserStore } from '@/stores/user.store';
-import type { DietLog, MealEntry } from '@/types';
+import type { DietLog, MacroTargets, MealEntry } from '@/types';
 
 interface DietState {
   logs: DietLog[];
   todayLog: DietLog | null;
   proteinStreakDays: number;
-  addMeal: (meal: MealEntry) => Promise<void>;
+  addMeal: (meal: MealEntry, effectiveTargets?: MacroTargets) => Promise<void>;
   removeMeal: (mealIndex: number) => Promise<void>;
   getTodayCompliance: () => number;
   loadFromStorage: () => Promise<void>;
@@ -36,7 +36,7 @@ export const useDietStore = create<DietState>((set, get) => ({
   todayLog: null,
   proteinStreakDays: 0,
 
-  addMeal: async (meal) => {
+  addMeal: async (meal, effectiveTargets?) => {
     const today = todayKey();
     const { logs } = get();
     const existing = logs.find((l) => l.date === today);
@@ -56,11 +56,11 @@ export const useDietStore = create<DietState>((set, get) => ({
     set({ logs: updatedLogs, todayLog: updated });
     await storageSet(STORAGE_KEYS.dietLog, updatedLogs);
 
-    // Check protein ratio against target
+    // Check protein ratio against target (use phase-adjusted targets when provided)
     const profile = useUserStore.getState().profile;
     if (!profile) return;
 
-    const target = profile.macroTargets.proteinG;
+    const target = (effectiveTargets ?? profile.macroTargets).proteinG;
     const proteinRatio = target > 0 ? macros.totalProteinG / target : 0;
 
     // Track protein streak (consecutive days hitting target)
