@@ -1438,10 +1438,11 @@ const s = StyleSheet.create({
   kvRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
+    gap: 8,
   },
-  kvKey: { fontSize: 11, color: BrutlColors.textDisabled },
-  kvVal: { fontSize: 11, color: BrutlColors.textPrimary, letterSpacing: 0.5 },
+  kvKey: { fontSize: 11, color: BrutlColors.textDisabled, flexShrink: 0 },
+  kvVal: { fontSize: 11, color: BrutlColors.textPrimary, letterSpacing: 0.5, flex: 1, textAlign: "right" },
   greenDot: {
     width: 6,
     height: 6,
