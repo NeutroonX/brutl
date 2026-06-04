@@ -1367,7 +1367,7 @@ const st = StyleSheet.create({
   },
   headerSub: { fontSize: 10, color: '#555555', marginTop: 1 },
   routinesBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: BrutlRadius.sm, borderWidth: 1, borderColor: BrutlColors.border },
-  gymShotBtn: { width: 34, height: 34, borderRadius: BrutlRadius.sm, borderWidth: 1, borderColor: `${BrutlColors.accent}50`, backgroundColor: `${BrutlColors.accent}12`, alignItems: 'center', justifyContent: 'center' },
+  gymShotBtn: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: BrutlRadius.sm, borderWidth: 1, borderColor: BrutlColors.border, alignItems: 'center', justifyContent: 'center' },
   routinesBtnTxt: { fontSize: 9, color: BrutlColors.textMuted, fontFamily: BrutlFonts.display, letterSpacing: 1 },
   headerRight: { alignItems: 'flex-end', gap: 2 },
   headerTimer: { fontSize: 14, color: BrutlColors.accent, fontFamily: BrutlFonts.mono },
