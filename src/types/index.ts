@@ -24,6 +24,8 @@ export interface UserProfile {
   macroTargets: MacroTargets;
   goalWeightKg?: number;
   createdAt: number;
+  updated_at?: number;
+  synced_at?: number;
 }
 
 export interface MacroTargets {
@@ -46,6 +48,8 @@ export interface WorkoutLog {
   exercises: ExerciseSet[];
   durationMinutes: number;
   xpEarned: number;
+  updated_at?: number;
+  synced_at?: number;
 }
 
 export interface MealEntry {
@@ -67,6 +71,8 @@ export interface DietLog {
   totalCarbsG: number;
   totalFatG: number;
   complianceScore: number;
+  updated_at?: number;
+  synced_at?: number;
 }
 
 export interface RoastEntry {
@@ -114,4 +120,6 @@ export interface WeightEntry {
   id: string;
   date: number;
   weightKg: number;
+  updated_at?: number;
+  synced_at?: number;
 }
